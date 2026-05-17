@@ -2,6 +2,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from './context/AuthContext'
+import { AccessibilityProvider } from './context/AccessibilityContext'
+import AccessibilityPanel from './components/ui/AccessibilityPanel'
 import ProtectedRoute, { AdminRoute } from './components/auth/ProtectedRoute'
 import PrivateLayout from './components/layout/PrivateLayout'
 
@@ -71,11 +73,13 @@ const queryClient = new QueryClient({
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <BrowserRouter>
-          <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
-          <Routes>
+    <AccessibilityProvider>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <BrowserRouter>
+            <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
+            <AccessibilityPanel />
+            <Routes>
             {/* Public */}
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<Login />} />
@@ -142,5 +146,6 @@ export default function App() {
         </BrowserRouter>
       </AuthProvider>
     </QueryClientProvider>
+    </AccessibilityProvider>
   )
 }

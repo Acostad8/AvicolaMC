@@ -6,7 +6,9 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\USUARIO\\\\Desktop\\\\sistema-avicola-mc\\\\src\\\\pages\\\\private\" -Recurse -Force)",
       "Bash(Select-Object FullName)",
       "Bash(Sort-Object FullName)",
-      "mcp__claude_ai_Supabase__execute_sql"
+      "mcp__claude_ai_Supabase__execute_sql",
+      "Bash(npm run *)",
+      "Bash(node --input-type=module --eval ' *)"
     ]
   }
 }

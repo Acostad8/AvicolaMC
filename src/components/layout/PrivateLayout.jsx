@@ -33,7 +33,7 @@ export default function PrivateLayout() {
   const title = getTitle(location.pathname)
 
   return (
-    <div className="flex h-screen bg-farm-cream overflow-hidden">
+    <div className="flex h-screen bg-stone-50 dark:bg-stone-950 overflow-hidden transition-colors duration-300">
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header title={title} onMenuToggle={() => setSidebarOpen(v => !v)} />

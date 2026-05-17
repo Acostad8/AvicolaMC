@@ -7,7 +7,7 @@ const Select = forwardRef(function Select({ label, error, options = [], placehol
       {label && <label className="label">{label}</label>}
       <select
         ref={ref}
-        className={cn('input-base bg-white', error && 'input-error', className)}
+        className={cn('input-base', error && 'input-error', className)}
         {...props}
       >
         {placeholder && <option value="">{placeholder}</option>}
