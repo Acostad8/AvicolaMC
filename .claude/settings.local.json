@@ -8,7 +8,21 @@
       "Bash(Sort-Object FullName)",
       "mcp__claude_ai_Supabase__execute_sql",
       "Bash(npm run *)",
-      "Bash(node --input-type=module --eval ' *)"
+      "Bash(node --input-type=module --eval ' *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\USUARIO\\\\Desktop\\\\sistema-avicola-mc\" -Recurse -Filter \"*migration*\" -ErrorAction SilentlyContinue)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(npx tsc *)",
+      "Bash(npx vite *)",
+      "Bash(git stash *)",
+      "mcp__claude_ai_Supabase__list_projects",
+      "mcp__claude_ai_Supabase__apply_migration",
+      "mcp__claude_ai_Supabase__restore_project",
+      "Bash(node --input-type=module)",
+      "mcp__claude_ai_Supabase__list_tables",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\USUARIO\\\\Desktop\\\\sistema-avicola-mc\" -Recurse -Directory)",
+      "Bash(Select-String \"src\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\USUARIO\\\\Desktop\\\\sistema-avicola-mc\" -Force)",
+      "Bash(Select-Object Name, PSIsContainer)"
     ]
   }
 }

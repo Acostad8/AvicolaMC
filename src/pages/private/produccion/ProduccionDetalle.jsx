@@ -1,26 +1,24 @@
-import { useParams, useNavigate } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useForm } from 'react-hook-form'
+import { useParams, Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../context/AuthContext'
-import { formatDate, formatNumber, calcPostura } from '../../../lib/utils'
+import { useConfig } from '../../../context/ConfigContext'
+import { formatDate, formatNumber } from '../../../lib/utils'
 import PageHeader from '../../../components/ui/PageHeader'
 import Button from '../../../components/ui/Button'
-import Input from '../../../components/ui/Input'
-import Textarea from '../../../components/ui/Textarea'
-import toast from 'react-hot-toast'
-import { differenceInHours, parseISO } from 'date-fns'
-import { Egg, Building2, Layers, TrendingUp, User, Clock, Pencil, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Egg, TrendingUp, User, Clock, Pencil, CheckCircle2, AlertCircle, History } from 'lucide-react'
 
-/* Postura badge */
+/* ── Postura badge (umbrales desde Configuración) ── */
 function PosturaBadge({ pct }) {
+  const { config } = useConfig()
+  const { postura_excelente: exc, postura_buena: bue } = config.produccion
   const n = parseFloat(pct) || 0
-  if (n >= 90) return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-sm font-bold text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30"><CheckCircle2 className="h-3.5 w-3.5" />{n.toFixed(1)}%</span>
-  if (n >= 75) return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-sm font-bold text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30"><TrendingUp className="h-3.5 w-3.5" />{n.toFixed(1)}%</span>
+  if (n >= exc) return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-sm font-bold text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30"><CheckCircle2 className="h-3.5 w-3.5" />{n.toFixed(1)}%</span>
+  if (n >= bue) return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-sm font-bold text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30"><TrendingUp className="h-3.5 w-3.5" />{n.toFixed(1)}%</span>
   return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-sm font-bold text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/30"><AlertCircle className="h-3.5 w-3.5" />{n.toFixed(1)}%</span>
 }
 
-/* Detail item */
+/* ── Detail item ── */
 function Detail({ label, value, accent }) {
   return (
     <div className="space-y-1">
@@ -30,12 +28,35 @@ function Detail({ label, value, accent }) {
   )
 }
 
+/* ── Genera lista de cambios entre dos snapshots ── */
+function formatearCambios(ant, nue) {
+  const etiquetas = {
+    huevos_producidos:   'Huevos producidos',
+    consumo_alimento_kg: 'Consumo alimento (kg)',
+    porcentaje_postura:  '% Postura',
+    observaciones:       'Observaciones',
+  }
+  const cambios = []
+  for (const campo of Object.keys(etiquetas)) {
+    const valAnt = ant[campo] ?? '—'
+    const valNue = nue[campo] ?? '—'
+    if (String(valAnt) !== String(valNue)) {
+      cambios.push({ campo: etiquetas[campo], anterior: valAnt, nuevo: valNue })
+    }
+  }
+  return cambios
+}
+
+function msDesdeCreacion(created_at) {
+  if (!created_at) return Infinity
+  return Date.now() - new Date(created_at).getTime()
+}
+
 export default function ProduccionDetalle() {
   const { id } = useParams()
-  const navigate = useNavigate()
   const { isAdmin } = useAuth()
-  const qc = useQueryClient()
 
+  /* ── Registro principal ── */
   const { data: reg, isLoading } = useQuery({
     queryKey: ['produccion-detalle', id],
     queryFn: async () => {
@@ -49,28 +70,29 @@ export default function ProduccionDetalle() {
     },
   })
 
-  const canEdit = isAdmin || (reg && differenceInHours(new Date(), parseISO(reg.created_at)) < 24)
-
-  const { register, handleSubmit, watch, formState: { isSubmitting } } = useForm()
-  const huevosWatch = watch('huevos_producidos')
-  const posturaPreview = reg?.lote?.cantidad_aves_actuales && huevosWatch >= 0
-    ? calcPostura(Number(huevosWatch), reg.lote.cantidad_aves_actuales)
-    : null
-
-  const mutation = useMutation({
-    mutationFn: async (values) => {
-      const postura = calcPostura(values.huevos_producidos, reg.lote?.cantidad_aves_actuales)
-      const { error } = await supabase.from('produccion').update({ ...values, porcentaje_postura: postura }).eq('id', id)
-      if (error) throw error
+  /* ── Auditoría ── */
+  const { data: auditoria } = useQuery({
+    queryKey: ['auditoria-produccion', id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('auditoria_produccion')
+        .select('*, editado:perfiles(nombre_completo)')
+        .eq('produccion_id', id)
+        .order('editado_at', { ascending: false })
+      return data || []
     },
-    onSuccess: () => {
-      qc.invalidateQueries(['produccion'])
-      toast.success('Registro actualizado')
-      navigate('/dashboard/produccion')
-    },
-    onError: e => toast.error(e.message),
+    enabled: !!id,
   })
 
+  /* ── Ventana de edición ── */
+  const msTranscurridos  = msDesdeCreacion(reg?.created_at)
+  const dentroDeVentana  = msTranscurridos <= 24 * 3600 * 1000
+  const msRestantes      = Math.max(0, 24 * 3600 * 1000 - msTranscurridos)
+  const horasRestantes   = Math.floor(msRestantes / 3600000)
+  const minsRestantes    = Math.floor((msRestantes % 3600000) / 60000)
+  const canEdit          = isAdmin || dentroDeVentana
+
+  /* ── Loading / Not found ── */
   if (isLoading) return (
     <div className="flex items-center justify-center py-20">
       <div className="text-center space-y-3">
@@ -97,15 +119,29 @@ export default function ProduccionDetalle() {
           { label: 'Producción', href: '/dashboard/produccion' },
           { label: formatDate(reg.fecha) },
         ]}
-        actions={canEdit && (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-lg text-xs font-semibold">
-            <Pencil className="h-3 w-3" />
-            Editable
-          </span>
-        )}
+        actions={
+          canEdit && (
+            <Link to={`/dashboard/produccion/${id}/editar`}>
+              <Button variant="secondary" icon={Pencil}>Editar</Button>
+            </Link>
+          )
+        }
       />
 
-      {/* Hero card */}
+      {/* ── Indicador de ventana de edición ── */}
+      {dentroDeVentana ? (
+        <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-2.5 text-xs text-amber-800 dark:text-amber-300">
+          <Clock className="h-3.5 w-3.5 flex-shrink-0" />
+          <span>Edición disponible por <strong>{horasRestantes}h {minsRestantes}min</strong> más</span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700 rounded-xl px-4 py-2.5 text-xs text-stone-500 dark:text-stone-400">
+          <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0" />
+          <span>Registro bloqueado — el período de edición de 24 horas ha finalizado</span>
+        </div>
+      )}
+
+      {/* ── Hero card ── */}
       <div className="card p-6 bg-gradient-to-br from-amber-50 to-orange-50/50 dark:from-stone-900 dark:to-amber-950/20 border-amber-200 dark:border-amber-900/40">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
@@ -125,16 +161,16 @@ export default function ProduccionDetalle() {
           </div>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-amber-200/60 dark:border-amber-900/30">
-          <Detail label="Fecha"         value={formatDate(reg.fecha)} />
-          <Detail label="Galpón"        value={reg.galpon?.nombre} />
-          <Detail label="Lote"          value={reg.lote?.nombre_numero} />
-          <Detail label="Raza"          value={reg.lote?.raza?.nombre} />
+          <Detail label="Fecha"  value={formatDate(reg.fecha)} />
+          <Detail label="Galpón" value={reg.galpon?.nombre} />
+          <Detail label="Lote"   value={reg.lote?.nombre_numero} />
+          <Detail label="Raza"   value={reg.lote?.raza?.nombre} />
         </div>
       </div>
 
-      {/* Details grid */}
+      {/* ── Detalles ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Aves & producción */}
+        {/* Producción */}
         <div className="card p-5 space-y-4">
           <div className="flex items-center gap-2 mb-1">
             <div className="w-7 h-7 bg-gradient-to-br from-green-400 to-green-600 rounded-lg flex items-center justify-center">
@@ -142,10 +178,10 @@ export default function ProduccionDetalle() {
             </div>
             <h2 className="section-title text-sm">Producción</h2>
           </div>
-          <Detail label="Aves en lote"        value={formatNumber(reg.lote?.cantidad_aves_actuales)} />
-          <Detail label="Huevos producidos"   value={formatNumber(reg.huevos_producidos)} accent="text-amber-600 dark:text-amber-400" />
-          <Detail label="% Postura"           value={`${reg.porcentaje_postura ?? 0}%`} accent="text-green-600 dark:text-green-400" />
-          <Detail label="Alimento consumido"  value={reg.consumo_alimento_kg != null ? `${reg.consumo_alimento_kg} kg` : '—'} />
+          <Detail label="Aves en lote"       value={formatNumber(reg.lote?.cantidad_aves_actuales)} />
+          <Detail label="Huevos producidos"  value={formatNumber(reg.huevos_producidos)} accent="text-amber-600 dark:text-amber-400" />
+          <Detail label="% Postura"          value={`${reg.porcentaje_postura ?? 0}%`} accent="text-green-600 dark:text-green-400" />
+          <Detail label="Alimento consumido" value={reg.consumo_alimento_kg != null ? `${reg.consumo_alimento_kg} kg` : '—'} />
           {reg.consumo_alimento_kg > 0 && reg.huevos_producidos > 0 && (
             <Detail
               label="Eficiencia alimentaria"
@@ -163,19 +199,13 @@ export default function ProduccionDetalle() {
             </div>
             <h2 className="section-title text-sm">Registro</h2>
           </div>
-          <Detail label="Registrado por"   value={reg.registrado?.nombre_completo} />
-          <Detail label="Creado el"        value={formatDate(reg.created_at)} />
-          <Detail label="ID del registro"  value={<span className="font-mono text-xs text-stone-400 dark:text-stone-500">{reg.id?.slice(0, 8)}…</span>} />
-          {!canEdit && (
-            <div className="flex items-center gap-2 text-xs text-stone-400 dark:text-stone-500 bg-stone-50 dark:bg-stone-800/50 rounded-xl px-3 py-2">
-              <Clock className="h-3.5 w-3.5 flex-shrink-0" />
-              Expiró el período de edición (24 h)
-            </div>
-          )}
+          <Detail label="Registrado por"  value={reg.registrado?.nombre_completo} />
+          <Detail label="Creado el"       value={formatDate(reg.created_at)} />
+          <Detail label="ID del registro" value={<span className="font-mono text-xs text-stone-400 dark:text-stone-500">{reg.id?.slice(0, 8)}…</span>} />
         </div>
       </div>
 
-      {/* Observaciones */}
+      {/* ── Observaciones ── */}
       {reg.observaciones && (
         <div className="card p-5">
           <h2 className="section-title text-sm mb-3">Observaciones</h2>
@@ -185,57 +215,61 @@ export default function ProduccionDetalle() {
         </div>
       )}
 
-      {/* Edit form */}
-      {canEdit && (
-        <div className="card p-5">
+      {/* ── Historial de ediciones ── */}
+      {auditoria && auditoria.length > 0 && (
+        <div className="card p-6">
           <div className="flex items-center gap-2 mb-4">
-            <div className="w-7 h-7 bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg flex items-center justify-center">
-              <Pencil className="h-3.5 w-3.5 text-white" aria-hidden="true" />
+            <div className="w-7 h-7 bg-gradient-to-br from-violet-400 to-violet-600 rounded-lg flex items-center justify-center">
+              <History className="h-3.5 w-3.5 text-white" />
             </div>
-            <h2 className="section-title">Editar registro</h2>
+            <h3 className="font-semibold text-stone-800 dark:text-stone-100 text-sm">
+              Historial de ediciones
+            </h3>
+            <span className="ml-auto text-xs text-stone-400 dark:text-stone-500">
+              {auditoria.length} edición{auditoria.length !== 1 ? 'es' : ''}
+            </span>
           </div>
-          <form onSubmit={handleSubmit(v => mutation.mutate(v))} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input
-                label="Huevos producidos"
-                type="number"
-                min="0"
-                defaultValue={reg.huevos_producidos}
-                {...register('huevos_producidos', { valueAsNumber: true })}
-              />
-              <Input
-                label="Consumo alimento (kg)"
-                type="number"
-                step="0.01"
-                min="0"
-                defaultValue={reg.consumo_alimento_kg}
-                {...register('consumo_alimento_kg', { valueAsNumber: true })}
-              />
-            </div>
 
-            {posturaPreview !== null && (
-              <div className="flex items-center gap-2 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900/50 rounded-xl px-4 py-2.5 text-sm text-green-700 dark:text-green-400">
-                <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
-                % Postura calculado: <strong className="ml-1">{posturaPreview}%</strong>
-              </div>
-            )}
+          <ol className="relative border-l border-stone-200 dark:border-stone-700 space-y-5 ml-2">
+            {auditoria.map((entrada) => {
+              const cambios = formatearCambios(entrada.datos_anteriores, entrada.datos_nuevos)
+              return (
+                <li key={entrada.id} className="ml-4">
+                  <span className="absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full border-2 border-white dark:border-stone-900 bg-violet-400 dark:bg-violet-500" />
+                  <div className="bg-stone-50 dark:bg-stone-800/50 rounded-xl p-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">
+                        {entrada.editado?.nombre_completo || 'Usuario desconocido'}
+                      </span>
+                      <span className="text-[11px] text-stone-400 dark:text-stone-500 tabular-nums">
+                        {entrada.editado_at
+                          ? new Date(entrada.editado_at).toLocaleString('es-CO', {
+                              day: '2-digit', month: '2-digit', year: 'numeric',
+                              hour: '2-digit', minute: '2-digit',
+                            })
+                          : '—'}
+                      </span>
+                    </div>
 
-            <Textarea
-              label="Observaciones"
-              defaultValue={reg.observaciones || ''}
-              rows={3}
-              {...register('observaciones')}
-            />
-
-            <div className="flex gap-3 pt-1">
-              <Button type="submit" loading={mutation.isPending || isSubmitting}>
-                Guardar cambios
-              </Button>
-              <Button type="button" variant="secondary" onClick={() => navigate('/dashboard/produccion')}>
-                Cancelar
-              </Button>
-            </div>
-          </form>
+                    {cambios.length === 0 ? (
+                      <p className="text-xs text-stone-400 dark:text-stone-500 italic">Sin cambios registrados</p>
+                    ) : (
+                      <ul className="space-y-1">
+                        {cambios.map(c => (
+                          <li key={c.campo} className="text-xs text-stone-600 dark:text-stone-300">
+                            <span className="font-medium">{c.campo}:</span>{' '}
+                            <span className="line-through text-stone-400 dark:text-stone-500">{c.anterior ?? '—'}</span>
+                            {' → '}
+                            <span className="text-stone-800 dark:text-stone-100 font-medium">{c.nuevo ?? '—'}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </li>
+              )
+            })}
+          </ol>
         </div>
       )}
     </div>

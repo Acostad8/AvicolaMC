@@ -22,7 +22,7 @@ const FEATURES = [
 ]
 
 export default function Login() {
-  const { session, signIn } = useAuth()
+  const { session, loading, signIn } = useAuth()
   const { noMotion } = useA11y()
   const navigate = useNavigate()
   const [showPass, setShowPass] = useState(false)
@@ -32,15 +32,19 @@ export default function Login() {
     resolver: zodResolver(schema),
   })
 
-  if (session) return <Navigate to="/dashboard" replace />
+  if (!loading && session) return <Navigate to="/dashboard" replace />
 
   async function onSubmit({ email, password }) {
     setError('')
     try {
       await signIn(email, password)
       navigate('/dashboard', { replace: true })
-    } catch {
-      setError('Correo o contraseña incorrectos. Verifica tus datos e intenta de nuevo.')
+    } catch (err) {
+      if (err.message === 'Tu cuenta está inactiva. Contacta al administrador.') {
+        setError('Tu cuenta se encuentra inactiva. Contacta al administrador del sistema.')
+      } else {
+        setError('Correo o contraseña incorrectos. Verifica tus datos e intenta de nuevo.')
+      }
     }
   }
 

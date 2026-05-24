@@ -106,7 +106,6 @@ export const TIPOS_PROVEEDOR = [
 
 export const TIPOS_AVE = [
   { value: 'ponedoras', label: 'Ponedoras' },
-  { value: 'engorde', label: 'Engorde' },
 ]
 
 export function getLabelFromValue(arr, value) {

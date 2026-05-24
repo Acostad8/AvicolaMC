@@ -3,13 +3,16 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
 import { getLabelFromValue, TIPOS_PROVEEDOR } from '../../../lib/utils'
-import { Plus, Eye, Truck } from 'lucide-react'
+import { Plus, Eye, Truck, Pencil} from 'lucide-react'
 import Button from '../../../components/ui/Button'
 import { StatusBadge } from '../../../components/ui/Badge'
 import PageHeader from '../../../components/ui/PageHeader'
 import Pagination from '../../../components/ui/Pagination'
 import EmptyState from '../../../components/ui/EmptyState'
 import { TableSkeleton } from '../../../components/ui/Skeleton'
+// import { Plus, Eye, Pencil, Users } from 'lucide-react'
+
+
 
 export default function ProveedoresList() {
   const [filterEstado, setFilterEstado] = useState('')
@@ -82,7 +85,11 @@ export default function ProveedoresList() {
                       <Link to={`/dashboard/proveedores/${p.id}`}>
                         <Button variant="ghost" size="sm" icon={Eye}>Ver</Button>
                       </Link>
+                      <Link to={`/dashboard/proveedores/${p.id}/editar`}>
+                          <Button variant="ghost" size="sm" icon={Pencil}>Editar</Button>
+                        </Link>
                     </td>
+                    
                   </tr>
                 ))}
               </tbody>

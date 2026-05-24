@@ -150,7 +150,7 @@ function GalponCard({ galpon, isAdmin, onToggle }) {
                 variant="ghost"
                 size="sm"
                 onClick={() => onToggle(galpon)}
-                className={isActivo ? 'text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30' : 'text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/30'}
+                className={isActivo ? 'text-red-500 dark:text-red-400  hover:bg-red-50 dark:hover:bg-red-950/30' : 'text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/30'}
               >
                 {isActivo ? 'Desactivar' : 'Activar'}
               </Button>

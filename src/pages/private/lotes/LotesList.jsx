@@ -6,7 +6,7 @@ import { useAuth } from '../../../context/AuthContext'
 import { useA11y } from '../../../context/AccessibilityContext'
 import { formatDate, calcWeeksAge, formatNumber } from '../../../lib/utils'
 import {
-  Plus, Eye, Layers, Search, X, LayoutGrid, List,
+  Plus, Eye, Pencil, Layers, Search, X, LayoutGrid, List,
   Bird, Calendar, TrendingDown, Activity, CheckCircle2,
 } from 'lucide-react'
 import Button from '../../../components/ui/Button'
@@ -63,7 +63,7 @@ function KpiCard({ icon: Icon, gradient, label, value, sub, loading }) {
 }
 
 /* ── Lote card ── */
-function LoteCard({ lote, index, noMotion }) {
+function LoteCard({ lote, index, noMotion, isAdmin }) {
   const isActivo = lote.estado === 'activo'
   const semanas  = isActivo ? calcWeeksAge(lote.fecha_ingreso) : null
   const pctSurv  = lote.cantidad_inicial_aves > 0
@@ -138,13 +138,18 @@ function LoteCard({ lote, index, noMotion }) {
           </div>
         )}
 
-        {/* Action */}
-        <div className="pt-3 border-t border-stone-100 dark:border-stone-800 mt-auto">
-          <Link to={`/dashboard/lotes/${lote.id}`} className="block">
+        {/* Actions */}
+        <div className="pt-3 border-t border-stone-100 dark:border-stone-800 mt-auto flex gap-2">
+          <Link to={`/dashboard/lotes/${lote.id}`} className={isAdmin && (isActivo || lote.estado === 'suspendido') ? 'flex-1' : 'block w-full'}>
             <Button variant="secondary" size="sm" icon={Eye} className="w-full justify-center text-xs group-hover:bg-primary-50 dark:group-hover:bg-primary-900/20 group-hover:border-primary-300 dark:group-hover:border-primary-700 group-hover:text-primary-700 dark:group-hover:text-primary-400 transition-all">
-              Ver detalle
+              Ver
             </Button>
           </Link>
+          {isAdmin && (isActivo || lote.estado === 'suspendido') && (
+            <Link to={`/dashboard/lotes/${lote.id}/editar`}>
+              <Button variant="ghost" size="sm" icon={Pencil} aria-label={`Editar ${lote.nombre_numero}`} />
+            </Link>
+          )}
         </div>
       </div>
     </article>
@@ -288,7 +293,7 @@ export default function LotesList() {
             <div className="card"><EmptyState icon={Layers} title="No hay lotes" description={search || filterEstado ? 'Ajusta los filtros aplicados.' : 'Crea el primer lote para comenzar.'} action={isAdmin && !search && !filterEstado && <Link to="/dashboard/lotes/nuevo"><Button icon={Plus} size="sm">Crear lote</Button></Link>} /></div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {paginated.map((l, i) => <LoteCard key={l.id} lote={l} index={i} noMotion={noMotion} />)}
+              {paginated.map((l, i) => <LoteCard key={l.id} lote={l} index={i} noMotion={noMotion} isAdmin={isAdmin} />)}
             </div>
           )}
           {filtered.length > pageSize && (
@@ -328,7 +333,14 @@ export default function LotesList() {
                       <td className="px-4 py-3 text-stone-600 dark:text-stone-400 whitespace-nowrap text-xs">{formatDate(l.fecha_ingreso)}</td>
                       <td className="px-4 py-3 whitespace-nowrap">{l.estado === 'activo' ? <span className="text-green-600 dark:text-green-400 font-semibold">{calcWeeksAge(l.fecha_ingreso)} sem.</span> : <span className="text-stone-400 dark:text-stone-600">—</span>}</td>
                       <td className="px-4 py-3"><StatusBadge status={l.estado} /></td>
-                      <td className="px-4 py-3"><Link to={`/dashboard/lotes/${l.id}`}><Button variant="ghost" size="sm" icon={Eye}>Ver</Button></Link></td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1">
+                          <Link to={`/dashboard/lotes/${l.id}`}><Button variant="ghost" size="sm" icon={Eye}>Ver</Button></Link>
+                          {isAdmin && (l.estado === 'activo' || l.estado === 'suspendido') && (
+                            <Link to={`/dashboard/lotes/${l.id}/editar`}><Button variant="ghost" size="sm" icon={Pencil} aria-label="Editar" /></Link>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

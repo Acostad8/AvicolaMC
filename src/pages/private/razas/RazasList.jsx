@@ -6,12 +6,10 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../context/AuthContext'
 import { useA11y } from '../../../context/AccessibilityContext'
-import { TIPOS_AVE, getLabelFromValue } from '../../../lib/utils'
-import { Plus, Pencil, Trash2, Bird, Search, X, Egg, Beef } from 'lucide-react'
+import { Plus, Pencil, Trash2, Bird, Search, X, Egg } from 'lucide-react'
 import Button from '../../../components/ui/Button'
 import Badge from '../../../components/ui/Badge'
 import Input from '../../../components/ui/Input'
-import Select from '../../../components/ui/Select'
 import Textarea from '../../../components/ui/Textarea'
 import Modal, { ConfirmModal } from '../../../components/ui/Modal'
 import PageHeader from '../../../components/ui/PageHeader'
@@ -21,36 +19,29 @@ import toast from 'react-hot-toast'
 
 const schema = z.object({
   nombre:      z.string().min(1, 'El nombre es requerido'),
-  tipo:        z.enum(['ponedoras', 'engorde']),
   descripcion: z.string().optional(),
 })
 
 /* ── Raza card ── */
 function RazaCard({ raza, isAdmin, onEdit, onDelete, index, noMotion }) {
-  const isPonedora = raza.tipo === 'ponedoras'
   return (
     <article
       className="card flex flex-col gap-0 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-200 group"
       style={!noMotion ? { animation: 'fadeInUp 0.5s ease-out both', animationDelay: `${index * 60}ms` } : {}}
     >
       {/* Color accent strip */}
-      <div className={`h-1.5 w-full ${isPonedora ? 'bg-gradient-to-r from-amber-400 to-yellow-400' : 'bg-gradient-to-r from-blue-400 to-cyan-400'}`} />
+      <div className="h-1.5 w-full bg-gradient-to-r from-amber-400 to-yellow-400" />
 
       <div className="p-5 flex flex-col gap-3 flex-1">
         {/* Icon + name */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-3 min-w-0">
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 ${isPonedora ? 'bg-gradient-to-br from-amber-400 to-amber-600 shadow-sm shadow-amber-500/25' : 'bg-gradient-to-br from-blue-400 to-blue-600 shadow-sm shadow-blue-500/25'}`}>
-              {isPonedora
-                ? <Egg className="h-6 w-6 text-white" aria-hidden="true" />
-                : <Beef className="h-6 w-6 text-white" aria-hidden="true" />
-              }
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-amber-400 to-amber-600 shadow-sm shadow-amber-500/25">
+              <Egg className="h-6 w-6 text-white" aria-hidden="true" />
             </div>
             <div className="min-w-0">
               <h3 className="font-bold text-stone-900 dark:text-stone-50 text-base">{raza.nombre}</h3>
-              <Badge variant={isPonedora ? 'amber' : 'blue'} className="mt-1">
-                {getLabelFromValue(TIPOS_AVE, raza.tipo)}
-              </Badge>
+              <Badge variant="amber" className="mt-1">Ponedoras</Badge>
             </div>
           </div>
         </div>
@@ -67,9 +58,9 @@ function RazaCard({ raza, isAdmin, onEdit, onDelete, index, noMotion }) {
         </div>
 
         {/* Type pill */}
-        <div className={`flex items-center gap-2 text-xs px-3 py-1.5 rounded-xl ${isPonedora ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400' : 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400'}`}>
+        <div className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400">
           <Bird className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
-          {isPonedora ? 'Raza de alta postura' : 'Raza para engorde'}
+          Raza de alta postura
         </div>
 
         {/* Actions */}
@@ -99,7 +90,7 @@ function RazaCard({ raza, isAdmin, onEdit, onDelete, index, noMotion }) {
   )
 }
 
-export default function RazasList() {
+export default function RazasList({ embedded = false }) {
   const { isAdmin } = useAuth()
   const { noMotion } = useA11y()
   const qc = useQueryClient()
@@ -118,16 +109,16 @@ export default function RazasList() {
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm({
     resolver: zodResolver(schema),
-    defaultValues: { tipo: 'ponedoras' },
   })
 
   const saveMutation = useMutation({
     mutationFn: async (values) => {
+      const payload = { ...values, tipo: 'ponedoras' }
       if (modal?.id) {
-        const { error } = await supabase.from('razas').update(values).eq('id', modal.id)
+        const { error } = await supabase.from('razas').update(payload).eq('id', modal.id)
         if (error) throw error
       } else {
-        const { error } = await supabase.from('razas').insert(values)
+        const { error } = await supabase.from('razas').insert(payload)
         if (error) throw error
       }
     },
@@ -154,12 +145,12 @@ export default function RazasList() {
   })
 
   function openEdit(raza) {
-    reset({ nombre: raza.nombre, tipo: raza.tipo, descripcion: raza.descripcion || '' })
+    reset({ nombre: raza.nombre, descripcion: raza.descripcion || '' })
     setModal(raza)
   }
 
   function openNew() {
-    reset({ nombre: '', tipo: 'ponedoras', descripcion: '' })
+    reset({ nombre: '', descripcion: '' })
     setModal({})
   }
 
@@ -170,22 +161,28 @@ export default function RazasList() {
       && (!filterTipo || r.tipo === filterTipo)
   })
 
-  const ponedoras = (data || []).filter(r => r.tipo === 'ponedoras').length
-  const engorde   = (data || []).filter(r => r.tipo === 'engorde').length
+  const ponedoras = (data || []).length
 
   return (
     <div className="space-y-5">
-      <PageHeader
-        title="Razas"
-        breadcrumbs={[
-          { label: 'Dashboard', href: '/dashboard' },
-          { label: 'Lotes y Razas', href: '/dashboard/lotes' },
-          { label: 'Razas' },
-        ]}
-        actions={isAdmin && (
-          <Button icon={Plus} onClick={openNew}>Nueva raza</Button>
-        )}
-      />
+      {!embedded && (
+        <PageHeader
+          title="Razas"
+          breadcrumbs={[
+            { label: 'Dashboard', href: '/dashboard' },
+            { label: 'Lotes y Razas', href: '/dashboard/lotes' },
+            { label: 'Razas' },
+          ]}
+          actions={isAdmin && (
+            <Button icon={Plus} onClick={openNew}>Nueva raza</Button>
+          )}
+        />
+      )}
+      {embedded && isAdmin && (
+        <div className="flex justify-end">
+          <Button icon={Plus} size="sm" onClick={openNew}>Nueva raza</Button>
+        </div>
+      )}
 
       {/* Summary chips */}
       {!isLoading && data?.length > 0 && (
@@ -197,10 +194,6 @@ export default function RazasList() {
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 rounded-xl text-xs font-medium text-amber-700 dark:text-amber-400">
             <Egg className="h-3.5 w-3.5" aria-hidden="true" />
             {ponedoras} ponedoras
-          </span>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/40 rounded-xl text-xs font-medium text-blue-700 dark:text-blue-400">
-            <Beef className="h-3.5 w-3.5" aria-hidden="true" />
-            {engorde} engorde
           </span>
         </div>
       )}
@@ -224,7 +217,6 @@ export default function RazasList() {
         <select className="input-base sm:w-44" value={filterTipo} onChange={e => setFilterTipo(e.target.value)}>
           <option value="">Todos los tipos</option>
           <option value="ponedoras">Ponedoras</option>
-          <option value="engorde">Engorde</option>
         </select>
       </div>
 
@@ -283,15 +275,9 @@ export default function RazasList() {
         <form className="space-y-4">
           <Input
             label="Nombre de la raza"
-            placeholder="Ej: Ross 308, Hy-Line Brown…"
+            placeholder="Ej: Hy-Line Brown, ISA Brown…"
             error={errors.nombre?.message}
             {...register('nombre')}
-          />
-          <Select
-            label="Tipo de ave"
-            options={TIPOS_AVE}
-            error={errors.tipo?.message}
-            {...register('tipo')}
           />
           <Textarea
             label="Descripción (opcional)"

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -42,12 +42,22 @@ export default function UsuarioForm() {
     defaultValues: { rol: 'encargado', estado: 'activo' },
   })
 
-  const rolWatch = watch('rol')
+  const rolWatch   = watch('rol')
+  const emailValue = watch('email')
 
   const { data: empleados } = useQuery({
     queryKey: ['empleados'],
     queryFn: async () => {
       const { data } = await supabase.from('empleados').select('id, nombre_completo').eq('estado', 'activo').order('nombre_completo')
+      return data || []
+    },
+  })
+
+  /* Emails ya registrados — para validación de duplicados */
+  const { data: emailsExistentes } = useQuery({
+    queryKey: ['perfiles-emails'],
+    queryFn: async () => {
+      const { data } = await supabase.from('perfiles').select('id, email')
       return data || []
     },
   })
@@ -66,6 +76,16 @@ export default function UsuarioForm() {
       .map(p => p.empleado_id)
   )
   const empleadosDisponibles = (empleados || []).filter(e => !empleadosOcupados.has(e.id))
+
+  /* Valida duplicado en tiempo real: coincide con otro usuario (distinto al editado) */
+  const emailDuplicado = useMemo(() => {
+    const valor = (emailValue || '').trim().toLowerCase()
+    if (!valor || !emailsExistentes?.length) return ''
+    const existe = emailsExistentes.find(
+      p => p.email?.toLowerCase() === valor && p.id !== id
+    )
+    return existe ? 'Este correo ya está registrado en el sistema' : ''
+  }, [emailValue, emailsExistentes, id])
 
   const { data: galpones } = useQuery({
     queryKey: ['galpones-todos'],
@@ -105,6 +125,13 @@ export default function UsuarioForm() {
 
   const mutation = useMutation({
     mutationFn: async (values) => {
+      /* Verificación doble de email duplicado antes de cualquier operación */
+      const emailNorm = values.email.trim().toLowerCase()
+      const conflicto = (emailsExistentes || []).find(
+        p => p.email?.toLowerCase() === emailNorm && p.id !== id
+      )
+      if (conflicto) throw new Error('Este correo ya está registrado en el sistema')
+
       if (isEdit) {
         if (id === currentUser?.id && values.estado === 'inactivo') throw new Error('No puedes desactivarte a ti mismo')
         if (id === currentUser?.id && values.rol !== 'administrador') throw new Error('No puedes quitarte el rol de administrador')
@@ -171,7 +198,7 @@ export default function UsuarioForm() {
       />
       <form onSubmit={handleSubmit(v => mutation.mutate(v))} className="card p-6 space-y-4">
         <Input label="Nombre completo" error={errors.nombre_completo?.message} {...register('nombre_completo')} />
-        <Input label="Correo electrónico" type="email" error={errors.email?.message} {...register('email')} />
+        <Input label="Correo electrónico" type="email" error={errors.email?.message || emailDuplicado} {...register('email')} />
         {!isEdit && <Input label="Contraseña temporal (mínimo 8 caracteres)" type="password" error={errors.password?.message} {...register('password')} />}
         <Select label="Rol" options={[{ value: 'administrador', label: 'Administrador' }, { value: 'encargado', label: 'Encargado' }]} error={errors.rol?.message} {...register('rol')} />
         <Select label="Estado" options={[{ value: 'activo', label: 'Activo' }, { value: 'inactivo', label: 'Inactivo' }]} error={errors.estado?.message} {...register('estado')} />
@@ -218,7 +245,7 @@ export default function UsuarioForm() {
         )}
 
         <div className="flex gap-3 pt-2">
-          <Button type="submit" loading={mutation.isPending || isSubmitting}>{isEdit ? 'Guardar cambios' : 'Crear usuario'}</Button>
+          <Button type="submit" loading={mutation.isPending || isSubmitting} disabled={!!emailDuplicado}>{isEdit ? 'Guardar cambios' : 'Crear usuario'}</Button>
           <Button type="button" variant="secondary" onClick={() => navigate('/dashboard/usuarios')}>Cancelar</Button>
         </div>
       </form>

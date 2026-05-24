@@ -1,8 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { queryClient } from './lib/queryClient'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from './context/AuthContext'
 import { AccessibilityProvider } from './context/AccessibilityContext'
+import { ConfigProvider } from './context/ConfigContext'
 import AccessibilityPanel from './components/ui/AccessibilityPanel'
 import ProtectedRoute, { AdminRoute } from './components/auth/ProtectedRoute'
 import PrivateLayout from './components/layout/PrivateLayout'
@@ -58,6 +60,7 @@ import EmpleadoDetalle from './pages/private/empleados/EmpleadoDetalle'
 // Usuarios
 import UsuariosList from './pages/private/usuarios/UsuariosList'
 import UsuarioForm from './pages/private/usuarios/UsuarioForm'
+import UsuarioDetalle from './pages/private/usuarios/UsuarioDetalle'
 
 // Proveedores
 import ProveedoresList from './pages/private/proveedores/ProveedoresList'
@@ -67,13 +70,14 @@ import ProveedorDetalle from './pages/private/proveedores/ProveedorDetalle'
 // Reportes
 import Reportes from './pages/private/Reportes'
 
-const queryClient = new QueryClient({
-  defaultOptions: { queries: { staleTime: 30_000, retry: 1 } },
-})
+// Configuración
+import Configuracion from './pages/private/configuracion/Configuracion'
+
 
 export default function App() {
   return (
     <AccessibilityProvider>
+      <ConfigProvider>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <BrowserRouter>
@@ -101,15 +105,18 @@ export default function App() {
                 <Route path="/dashboard/lotes" element={<LotesList />} />
                 <Route path="/dashboard/lotes/nuevo" element={<LoteForm />} />
                 <Route path="/dashboard/lotes/:id" element={<LoteDetalle />} />
+                <Route path="/dashboard/lotes/:id/editar" element={<AdminRoute><LoteForm /></AdminRoute>} />
                 <Route path="/dashboard/razas" element={<RazasList />} />
 
                 <Route path="/dashboard/produccion" element={<ProduccionList />} />
                 <Route path="/dashboard/produccion/nuevo" element={<ProduccionForm />} />
                 <Route path="/dashboard/produccion/:id" element={<ProduccionDetalle />} />
+                <Route path="/dashboard/produccion/:id/editar" element={<ProduccionForm />} />
 
                 <Route path="/dashboard/mortalidad" element={<MortalidadList />} />
                 <Route path="/dashboard/mortalidad/nuevo" element={<MortalidadForm />} />
                 <Route path="/dashboard/mortalidad/:id" element={<MortalidadDetalle />} />
+                <Route path="/dashboard/mortalidad/:id/editar" element={<MortalidadForm />} />
 
                 <Route path="/dashboard/tratamientos" element={<TratamientosList />} />
                 <Route path="/dashboard/tratamientos/nuevo" element={<AdminRoute><TratamientoForm /></AdminRoute>} />
@@ -129,6 +136,7 @@ export default function App() {
 
                 <Route path="/dashboard/usuarios" element={<AdminRoute><UsuariosList /></AdminRoute>} />
                 <Route path="/dashboard/usuarios/nuevo" element={<AdminRoute><UsuarioForm /></AdminRoute>} />
+                <Route path="/dashboard/usuarios/:id" element={<AdminRoute><UsuarioDetalle /></AdminRoute>} />
                 <Route path="/dashboard/usuarios/:id/editar" element={<AdminRoute><UsuarioForm /></AdminRoute>} />
 
                 <Route path="/dashboard/proveedores" element={<AdminRoute><ProveedoresList /></AdminRoute>} />
@@ -137,6 +145,7 @@ export default function App() {
                 <Route path="/dashboard/proveedores/:id/editar" element={<AdminRoute><ProveedorForm /></AdminRoute>} />
 
                 <Route path="/dashboard/reportes" element={<Reportes />} />
+                <Route path="/dashboard/configuracion" element={<AdminRoute><Configuracion /></AdminRoute>} />
                 <Route path="/dashboard/*" element={<Navigate to="/dashboard" replace />} />
               </Route>
             </Route>
@@ -146,6 +155,7 @@ export default function App() {
         </BrowserRouter>
       </AuthProvider>
     </QueryClientProvider>
+    </ConfigProvider>
     </AccessibilityProvider>
   )
 }

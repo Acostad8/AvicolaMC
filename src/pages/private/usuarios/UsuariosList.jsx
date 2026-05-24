@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
 import { formatDate } from '../../../lib/utils'
-import { Plus, Pencil, UserCog } from 'lucide-react'
+import { Plus, Pencil, Eye, UserCog } from 'lucide-react'
 import Button from '../../../components/ui/Button'
 import Badge, { StatusBadge } from '../../../components/ui/Badge'
 import PageHeader from '../../../components/ui/PageHeader'
@@ -46,7 +46,7 @@ export default function UsuariosList() {
             <table className="w-full text-sm">
               <thead className="bg-stone-50 border-b border-stone-200">
                 <tr>
-                  {['Nombre', 'Correo', 'Rol', 'Estado', 'Último acceso', 'Acciones'].map(h => (
+                  {['Nombre', 'Correo', 'Rol', 'Estado', 'Último acceso', ''].map(h => (
                     <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-stone-600 uppercase">{h}</th>
                   ))}
                 </tr>
@@ -62,9 +62,14 @@ export default function UsuariosList() {
                     <td className="px-4 py-3"><StatusBadge status={u.estado} /></td>
                     <td className="px-4 py-3 text-stone-500 text-xs">{u.ultimo_acceso ? formatDate(u.ultimo_acceso) : 'Nunca'}</td>
                     <td className="px-4 py-3">
-                      <Link to={`/dashboard/usuarios/${u.id}/editar`}>
-                        <Button variant="ghost" size="sm" icon={Pencil}>Editar</Button>
-                      </Link>
+                      <div className="flex items-center gap-1">
+                        <Link to={`/dashboard/usuarios/${u.id}`}>
+                          <Button variant="ghost" size="sm" icon={Eye}>Ver</Button>
+                        </Link>
+                        <Link to={`/dashboard/usuarios/${u.id}/editar`}>
+                          <Button variant="ghost" size="sm" icon={Pencil}>Editar</Button>
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Diagramas C4 – Sistema Avícola MC</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #0f1117;
+      --surface:     #1a1d27;
+      --surface2:    #22263a;
+      --border:      #2e3250;
+      --accent:      #6366f1;
+      --accent2:     #22d3ee;
+      --text:        #e2e8f0;
+      --muted:       #8892b0;
+      --badge-bg:    #1e2133;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      padding: 2rem 1rem 4rem;
+    }
+
+    /* ── Header ── */
+    .header {
+      text-align: center;
+      margin-bottom: 3rem;
+    }
+    .header .tag {
+      display: inline-block;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+      font-size: .7rem;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      padding: .35rem .9rem;
+      border-radius: 2rem;
+      margin-bottom: 1rem;
+    }
+    .header h1 {
+      font-size: clamp(1.6rem, 4vw, 2.6rem);
+      font-weight: 800;
+      background: linear-gradient(135deg, #fff 0%, var(--accent2) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      line-height: 1.2;
+      margin-bottom: .6rem;
+    }
+    .header p {
+      color: var(--muted);
+      font-size: .95rem;
+      max-width: 560px;
+      margin: 0 auto;
+    }
+
+    /* ── Tabs ── */
+    .tabs {
+      display: flex;
+      justify-content: center;
+      gap: .6rem;
+      margin-bottom: 2.5rem;
+      flex-wrap: wrap;
+    }
+    .tab-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: .55rem 1.4rem;
+      border-radius: .6rem;
+      font-size: .88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .2s;
+    }
+    .tab-btn:hover { border-color: var(--accent); color: var(--text); }
+    .tab-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      box-shadow: 0 0 18px rgba(99,102,241,.4);
+    }
+
+    /* ── Panel container ── */
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* ── Diagram card ── */
+    .diagram-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      overflow: hidden;
+      margin-bottom: 2rem;
+    }
+    .diagram-card__head {
+      display: flex;
+      align-items: center;
+      gap: .8rem;
+      padding: 1rem 1.4rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface2);
+    }
+    .level-badge {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+      font-size: .68rem;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      padding: .25rem .75rem;
+      border-radius: 1rem;
+    }
+    .diagram-card__head h2 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .diagram-card__head p {
+      font-size: .8rem;
+      color: var(--muted);
+      margin-left: auto;
+    }
+    .diagram-card__body {
+      padding: 1.5rem;
+      overflow-x: auto;
+    }
+    .diagram-card__body .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* ── Info grid ── */
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .info-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: .75rem;
+      padding: 1rem 1.2rem;
+    }
+    .info-card__icon {
+      font-size: 1.4rem;
+      margin-bottom: .5rem;
+    }
+    .info-card h3 {
+      font-size: .85rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: .3rem;
+    }
+    .info-card p {
+      font-size: .78rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    /* ── DB tables section ── */
+    .section-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+    .section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .tables-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2.5rem;
+    }
+    .table-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: .75rem;
+      overflow: hidden;
+    }
+    .table-card__head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: .7rem 1rem;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+    }
+    .table-card__head h4 {
+      font-family: 'Courier New', monospace;
+      font-size: .82rem;
+      font-weight: 700;
+      color: var(--accent2);
+    }
+    .table-card__body {
+      padding: .7rem 1rem;
+    }
+    .field-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: .25rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: .75rem;
+    }
+    .field-row:last-child { border-bottom: none; }
+    .field-name { color: var(--text); font-family: 'Courier New', monospace; }
+    .field-type { color: var(--muted); }
+    .field-pk  { color: #f59e0b; font-weight: 700; }
+    .field-fk  { color: #6ee7b7; }
+
+    /* ── Mermaid override for dark theme ── */
+    .mermaid svg { max-width: 100%; height: auto; }
+
+    @media (max-width: 600px) {
+      .diagram-card__head p { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="tag">Arquitectura de Software · Modelo C4</div>
+  <h1>Sistema Avícola MC</h1>
+  <p>Diagramas C4 – Nivel 1 (Contexto del Sistema) y Nivel 2 (Contenedores)</p>
+</div>
+
+<!-- Tabs -->
+<div class="tabs">
+  <button class="tab-btn active" onclick="showPanel('ctx')">Nivel 1 · Contexto</button>
+  <button class="tab-btn"        onclick="showPanel('cnt')">Nivel 2 · Contenedores</button>
+  <button class="tab-btn"        onclick="showPanel('db')">Base de Datos</button>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     PANEL 1 – CONTEXTO DEL SISTEMA
+══════════════════════════════════════════════════════ -->
+<div id="panel-ctx" class="panel active">
+
+  <div class="info-grid">
+    <div class="info-card">
+      <div class="info-card__icon">🎯</div>
+      <h3>Propósito</h3>
+      <p>Gestión integral de granjas avícolas: lotes, producción, mortalidad, tratamientos e inventario.</p>
+    </div>
+    <div class="info-card">
+      <div class="info-card__icon">👤</div>
+      <h3>Administrador</h3>
+      <p>Gestiona usuarios, proveedores, empleados, configuración y tiene acceso total al sistema.</p>
+    </div>
+    <div class="info-card">
+      <div class="info-card__icon">🐔</div>
+      <h3>Encargado de Galpón</h3>
+      <p>Registra producción diaria, mortalidad, tratamientos e insumos para sus galpones asignados.</p>
+    </div>
+    <div class="info-card">
+      <div class="info-card__icon">☁️</div>
+      <h3>Supabase (BaaS)</h3>
+      <p>Provee autenticación JWT, base de datos PostgreSQL y funciones serverless (Edge Functions).</p>
+    </div>
+  </div>
+
+  <div class="diagram-card">
+    <div class="diagram-card__head">
+      <span class="level-badge">Nivel 1</span>
+      <h2>Diagrama de Contexto del Sistema</h2>
+      <p>C4 – System Context</p>
+    </div>
+    <div class="diagram-card__body">
+      <div class="mermaid">
+C4Context
+  title Diagrama de Contexto — Sistema Avícola MC
+
+  Person(admin, "Administrador de Granja", "Gestiona usuarios, configuración, proveedores y empleados. Acceso total al sistema.")
+  Person(encargado, "Encargado de Galpón", "Registra producción diaria, mortalidad, tratamientos e insumos en sus galpones.")
+
+  System(sistemaAvicola, "Sistema Avícola MC", "Aplicación web SPA para la gestión integral de operaciones avícolas. Módulos: galpones, lotes, producción, mortalidad, tratamientos, insumos, proveedores, reportes y configuración.")
+
+  System_Ext(supabase, "Supabase", "Plataforma BaaS: autenticación JWT (email/contraseña), base de datos PostgreSQL con RLS y Edge Functions Deno/TypeScript.")
+  System_Ext(email, "Servicio de Correo (SMTP)", "Envío transaccional de correos para recuperación de contraseña y notificaciones de sistema.")
+
+  Rel(admin, sistemaAvicola, "Administra y configura el sistema", "HTTPS · Navegador Web")
+  Rel(encargado, sistemaAvicola, "Registra datos operacionales diarios", "HTTPS · Navegador Web")
+  Rel(sistemaAvicola, supabase, "Autenticación, consultas y mutaciones de datos", "REST / WebSocket (PostgREST)")
+  Rel(supabase, email, "Envía correos de recuperación de contraseña", "SMTP")
+
+  UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
+      </div>
+    </div>
+  </div>
+
+  <div class="diagram-card">
+    <div class="diagram-card__head">
+      <span class="level-badge">Relaciones</span>
+      <h2>Flujo de Interacciones</h2>
+      <p>Actores y sistemas externos</p>
+    </div>
+    <div class="diagram-card__body">
+      <div class="mermaid">
+flowchart TD
+  subgraph Usuarios["👥 Usuarios del Sistema"]
+    A["🧑‍💼 Administrador\nAcceso total"]
+    B["👷 Encargado de Galpón\nAcceso por galpones asignados"]
+  end
+
+  subgraph SAM["🖥️ Sistema Avícola MC (SPA)"]
+    C["Módulo de Autenticación\n& Control de Acceso"]
+    D["Módulos Operacionales\nGalpones · Lotes · Producción\nMortalidad · Tratamientos · Insumos"]
+    E["Módulos Administrativos\nUsuarios · Empleados · Proveedores\nRazas · Configuración"]
+    F["Reportes & Exportación\nCSV · PDF · Gráficas"]
+  end
+
+  subgraph Supabase["☁️ Supabase (Backend)"]
+    G["Supabase Auth\nJWT · Sessions"]
+    H["PostgreSQL + RLS\nDatos Operacionales"]
+    I["Edge Functions\ncreate-user (Deno)"]
+  end
+
+  J["📧 SMTP\nRecuperación de contraseña"]
+
+  A -->|HTTPS| C
+  B -->|HTTPS| C
+  C -->|Valida sesión| G
+  D -->|PostgREST CRUD| H
+  E -->|PostgREST CRUD| H
+  E -->|Crea usuarios| I
+  F -->|Consulta| H
+  G -->|auth.users| H
+  G -->|Envía email| J
+
+  style SAM fill:#1a1d27,stroke:#6366f1,color:#e2e8f0
+  style Supabase fill:#1a1d27,stroke:#22d3ee,color:#e2e8f0
+  style Usuarios fill:#1a1d27,stroke:#6ee7b7,color:#e2e8f0
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     PANEL 2 – CONTENEDORES
+══════════════════════════════════════════════════════ -->
+<div id="panel-cnt" class="panel">
+
+  <div class="info-grid">
+    <div class="info-card">
+      <div class="info-card__icon">⚛️</div>
+      <h3>React SPA</h3>
+      <p>React 19 + Vite 8. Enrutamiento con React Router v7. Estado del servidor con TanStack Query v5.</p>
+    </div>
+    <div class="info-card">
+      <div class="info-card__icon">🔐</div>
+      <h3>Supabase Auth</h3>
+      <p>Autenticación por email/contraseña. Tokens JWT. Recuperación de contraseña por correo.</p>
+    </div>
+    <div class="info-card">
+      <div class="info-card__icon">🗄️</div>
+      <h3>PostgreSQL + RLS</h3>
+      <p>15 tablas operacionales. Row Level Security: admins ven todo; encargados solo sus galpones.</p>
+    </div>
+    <div class="info-card">
+      <div class="info-card__icon">⚡</div>
+      <h3>Edge Functions</h3>
+      <p>Función <code>create-user</code> en Deno/TypeScript. Crea usuarios con verificación de permisos de admin.</p>
+    </div>
+  </div>
+
+  <div class="diagram-card">
+    <div class="diagram-card__head">
+      <span class="level-badge">Nivel 2</span>
+      <h2>Diagrama de Contenedores</h2>
+      <p>C4 – Container Diagram</p>
+    </div>
+    <div class="diagram-card__body">
+      <div class="mermaid">
+C4Container
+  title Diagrama de Contenedores — Sistema Avícola MC
+
+  Person(admin, "Administrador", "Acceso total al sistema")
+  Person(encargado, "Encargado", "Acceso a galpones asignados")
+
+  System_Boundary(sam, "Sistema Avícola MC") {
+    Container(spa, "Aplicación Web (SPA)", "React 19 + Vite 8", "Interfaz de usuario completa: dashboard, 11 módulos de gestión, reportes y configuración. React Router v7 para navegación.")
+    Container(queryCache, "Capa de Estado y Caché", "TanStack React Query v5", "Gestiona el estado del servidor: caché de consultas, sincronización de datos y mutaciones. staleTime: 30 s, retry: 1.")
+    Container(authCtx, "Contexto de Autenticación", "React Context + Supabase JS", "Gestiona sesión JWT, perfil del usuario, rol (admin/encargado) y estado de autenticación en el cliente.")
+    ContainerDb(localStorage, "Configuración Local", "Browser localStorage", "Persiste la configuración de la granja: nombre, NIT, umbrales de postura y alertas de mortalidad.")
+  }
+
+  System_Boundary(sb, "Supabase Platform") {
+    Container(sbAuth, "Supabase Auth", "GoTrue + JWT", "Autenticación por email y contraseña. Emite y refresca tokens JWT. Gestiona sesiones y recuperación de contraseña.")
+    ContainerDb(postgres, "Base de Datos", "PostgreSQL 15 + PostgREST", "15 tablas operacionales con Row Level Security. Almacena galpones, lotes, producción, mortalidad, tratamientos, insumos, empleados, usuarios y auditoría.")
+    Container(edge, "Edge Functions", "Deno + TypeScript", "Función create-user: crea cuentas de usuario verificando que el invocador tenga rol administrador.")
+  }
+
+  System_Ext(smtp, "Servicio SMTP", "Supabase SMTP", "Envío de correos transaccionales para recuperación de contraseña.")
+
+  Rel(admin,    spa, "Usa via navegador", "HTTPS")
+  Rel(encargado, spa, "Usa via navegador", "HTTPS")
+
+  Rel(spa, authCtx,    "Lee sesión y perfil")
+  Rel(spa, queryCache, "Cachea y sincroniza datos")
+  Rel(spa, localStorage, "Lee/escribe configuración")
+  Rel(spa, edge,   "Invoca crear usuario (admin)", "HTTPS / REST")
+
+  Rel(authCtx,    sbAuth,   "Login, logout, refresh token", "HTTPS / REST")
+  Rel(queryCache, postgres, "Ejecuta consultas y mutaciones", "PostgREST / HTTPS")
+
+  Rel(sbAuth,  postgres, "Gestiona tabla auth.users")
+  Rel(sbAuth,  smtp,     "Envía correo de recuperación", "SMTP")
+  Rel(edge,    postgres, "Inserta nuevo usuario + perfil", "SQL interno")
+
+  UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="2")
+      </div>
+    </div>
+  </div>
+
+  <div class="diagram-card">
+    <div class="diagram-card__head">
+      <span class="level-badge">Detalle</span>
+      <h2>Arquitectura Interna del SPA</h2>
+      <p>Capas del frontend React</p>
+    </div>
+    <div class="diagram-card__body">
+      <div class="mermaid">
+flowchart TB
+  subgraph Browser["🌐 Navegador Web"]
+
+    subgraph Entry["Entrada"]
+      V["Vite Dev/Build\n+ React Router v7"]
+    end
+
+    subgraph Contexts["Contextos Globales"]
+      AC["AuthContext\nSesión · Perfil · Rol"]
+      CC["ConfigContext\nNombre granja · Umbrales"]
+      AX["AccessibilityContext\nDark mode · Accesibilidad"]
+    end
+
+    subgraph Pages["Páginas / Módulos (React Query)"]
+      direction LR
+      PUB["Públicas\nLanding · Login\nRecuperación"]
+      PRIV["Privadas · Admin\nUsuarios · Empleados\nProveedores · Razas\nConfiguración"]
+      OPS["Privadas · Operativas\nGalpones · Lotes\nProducción · Mortalidad\nTratamientos · Insumos"]
+      RPT["Reportes\nCSV · PDF · Recharts"]
+    end
+
+    subgraph DataLayer["Capa de Datos"]
+      QC["TanStack Query\nCache · Mutations"]
+      SB["@supabase/supabase-js\nPostgREST · Auth · Realtime"]
+      LS["localStorage\nConfiguración"]
+    end
+
+  end
+
+  V --> Contexts
+  Contexts --> Pages
+  Pages --> DataLayer
+  QC --> SB
+
+  style Browser fill:#0f1117,stroke:#2e3250,color:#e2e8f0
+  style Contexts fill:#1a1d27,stroke:#6366f1,color:#e2e8f0
+  style Pages fill:#1a1d27,stroke:#22d3ee,color:#e2e8f0
+  style DataLayer fill:#1a1d27,stroke:#6ee7b7,color:#e2e8f0
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     PANEL 3 – BASE DE DATOS
+══════════════════════════════════════════════════════ -->
+<div id="panel-db" class="panel">
+
+  <div class="diagram-card">
+    <div class="diagram-card__head">
+      <span class="level-badge">Esquema</span>
+      <h2>Modelo de Base de Datos (PostgreSQL)</h2>
+      <p>Relaciones entre tablas</p>
+    </div>
+    <div class="diagram-card__body">
+      <div class="mermaid">
+erDiagram
+  perfiles {
+    uuid id PK
+    text email
+    text nombre_completo
+    text rol
+    text estado
+    uuid empleado_id FK
+    timestamp ultimo_acceso
+  }
+
+  galpones {
+    uuid id PK
+    text nombre
+    int capacidad_maxima
+    text descripcion
+    text estado
+    uuid encargado_id FK
+  }
+
+  razas {
+    uuid id PK
+    text nombre
+    timestamp created_at
+  }
+
+  lotes {
+    uuid id PK
+    text nombre_numero
+    uuid galpon_id FK
+    uuid raza_id FK
+    int cantidad_inicial_aves
+    int cantidad_aves_actuales
+    date fecha_ingreso
+    text estado
+    text notas
+  }
+
+  produccion {
+    uuid id PK
+    uuid galpon_id FK
+    uuid lote_id FK
+    date fecha
+    int huevos_producidos
+    numeric consumo_alimento_kg
+    text observaciones
+    uuid registrado_por FK
+    timestamp created_at
+    timestamp updated_at
+  }
+
+  auditoria_produccion {
+    uuid id PK
+    uuid produccion_id FK
+    uuid editado_por FK
+    jsonb datos_anteriores
+    jsonb datos_nuevos
+    timestamp editado_at
+  }
+
+  mortalidad {
+    uuid id PK
+    uuid galpon_id FK
+    uuid lote_id FK
+    date fecha
+    int cantidad_bajas
+    text causa
+    text observaciones
+    uuid registrado_por FK
+    timestamp created_at
+  }
+
+  auditoria_mortalidad {
+    uuid id PK
+    uuid mortalidad_id FK
+    uuid editado_por FK
+    jsonb datos_anteriores
+    jsonb datos_nuevos
+    timestamp editado_at
+  }
+
+  tratamientos {
+    uuid id PK
+    uuid galpon_id FK
+    uuid lote_id FK
+    text tipo
+    uuid insumo_id FK
+    numeric cantidad_usada
+    date fecha_inicio
+    date fecha_fin
+    text responsable
+    text estado
+    uuid registrado_por FK
+  }
+
+  insumos {
+    uuid id PK
+    text nombre
+    text categoria
+    text unidad_medida
+    numeric stock_actual
+    int stock_minimo
+    text estado
+  }
+
+  movimientos_insumos {
+    uuid id PK
+    uuid insumo_id FK
+    uuid proveedor_id FK
+    text tipo
+    numeric cantidad
+    date fecha
+    uuid registrado_por FK
+  }
+
+  empleados {
+    uuid id PK
+    text nombre_completo
+    text documento_identidad
+    text cargo
+    text telefono
+    date fecha_ingreso
+    text estado
+  }
+
+  proveedores {
+    uuid id PK
+    text nombre
+    text tipo_proveedor
+    text telefono
+    text correo
+    text direccion
+    text estado
+  }
+
+  proveedores_insumos {
+    uuid proveedor_id FK
+    uuid insumo_id FK
+  }
+
+  proveedores_razas {
+    uuid proveedor_id FK
+    uuid raza_id FK
+  }
+
+  perfiles        ||--o{ galpones              : "encargado_id"
+  perfiles        ||--o{ produccion             : "registrado_por"
+  perfiles        ||--o{ mortalidad             : "registrado_por"
+  perfiles        ||--o{ tratamientos           : "registrado_por"
+  perfiles        ||--o{ movimientos_insumos    : "registrado_por"
+  perfiles        ||--o| empleados              : "empleado_id"
+  perfiles        ||--o{ auditoria_produccion   : "editado_por"
+  perfiles        ||--o{ auditoria_mortalidad   : "editado_por"
+
+  galpones        ||--o{ lotes                  : "galpon_id"
+  galpones        ||--o{ produccion             : "galpon_id"
+  galpones        ||--o{ mortalidad             : "galpon_id"
+  galpones        ||--o{ tratamientos           : "galpon_id"
+
+  razas           ||--o{ lotes                  : "raza_id"
+
+  lotes           ||--o{ produccion             : "lote_id"
+  lotes           ||--o{ mortalidad             : "lote_id"
+  lotes           ||--o{ tratamientos           : "lote_id"
+
+  produccion      ||--o{ auditoria_produccion   : "produccion_id"
+  mortalidad      ||--o{ auditoria_mortalidad   : "mortalidad_id"
+
+  insumos         ||--o{ tratamientos           : "insumo_id"
+  insumos         ||--o{ movimientos_insumos    : "insumo_id"
+  insumos         ||--o{ proveedores_insumos    : "insumo_id"
+
+  proveedores     ||--o{ movimientos_insumos    : "proveedor_id"
+  proveedores     ||--o{ proveedores_insumos    : "proveedor_id"
+  proveedores     ||--o{ proveedores_razas      : "proveedor_id"
+
+  razas           ||--o{ proveedores_razas      : "raza_id"
+      </div>
+    </div>
+  </div>
+
+  <p class="section-title">Tablas del sistema</p>
+  <div class="tables-grid">
+
+    <div class="table-card">
+      <div class="table-card__head">
+        <h4>perfiles</h4>
+        <span style="font-size:.7rem;color:var(--muted)">Usuarios del sistema</span>
+      </div>
+      <div class="table-card__body">
+        <div class="field-row"><span class="field-name field-pk">id</span><span class="field-type">uuid PK</span></div>
+        <div class="field-row"><span class="field-name">email</span><span class="field-type">text unique</span></div>
+        <div class="field-row"><span class="field-name">nombre_completo</span><span class="field-type">text</span></div>
+        <div class="field-row"><span class="field-name">rol</span><span class="field-type">admin | encargado</span></div>
+        <div class="field-row"><span class="field-name">estado</span><span class="field-type">activo | inactivo</span></div>
+        <div class="field-row"><span class="field-name field-fk">empleado_id</span><span class="field-type">FK → empleados</span></div>
+        <div class="field-row"><span class="field-name">ultimo_acceso</span><span class="field-type">timestamp</span></div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-card__head">
+        <h4>galpones</h4>
+        <span style="font-size:.7rem;color:var(--muted)">Gallineros / Coops</span>
+      </div>
+      <div class="table-card__body">
+        <div class="field-row"><span class="field-name field-pk">id</span><span class="field-type">uuid PK</span></div>
+        <div class="field-row"><span class="field-name">nombre</span><span class="field-type">text</span></div>
+        <div class="field-row"><span class="field-name">capacidad_maxima</span><span class="field-type">integer</span></div>
+        <div class="field-row"><span class="field-name">estado</span><span class="field-type">activo | inactivo</span></div>
+        <div class="field-row"><span class="field-name field-fk">encargado_id</span><span class="field-type">FK → perfiles</span></div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-card__head">
+        <h4>lotes</h4>
+        <span style="font-size:.7rem;color:var(--muted)">Lotes de aves</span>
+      </div>
+      <div class="table-card__body">
+        <div class="field-row"><span class="field-name field-pk">id</span><span class="field-type">uuid PK</span></div>
+        <div class="field-row"><span class="field-name">nombre_numero</span><span class="field-type">text</span></div>
+        <div class="field-row"><span class="field-name field-fk">galpon_id</span><span class="field-type">FK → galpones</span></div>
+        <div class="field-row"><span class="field-name field-fk">raza_id</span><span class="field-type">FK → razas</span></div>
+        <div class="field-row"><span class="field-name">cantidad_inicial_aves</span><span class="field-type">integer</span></div>
+        <div class="field-row"><span class="field-name">cantidad_aves_actuales</span><span class="field-type">integer</span></div>
+        <div class="field-row"><span class="field-name">fecha_ingreso</span><span class="field-type">date</span></div>
+        <div class="field-row"><span class="field-name">estado</span><span class="field-type">activo | inactivo</span></div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-card__head">
+        <h4>produccion</h4>
+        <span style="font-size:.7rem;color:var(--muted)">Registro diario de huevos</span>
+      </div>
+      <div class="table-card__body">
+        <div class="field-row"><span class="field-name field-pk">id</span><span class="field-type">uuid PK</span></div>
+        <div class="field-row"><span class="field-name field-fk">galpon_id</span><span class="field-type">FK → galpones</span></div>
+        <div class="field-row"><span class="field-name field-fk">lote_id</span><span class="field-type">FK → lotes</span></div>
+        <div class="field-row"><span class="field-name">fecha</span><span class="field-type">date</span></div>
+        <div class="field-row"><span class="field-name">huevos_producidos</span><span class="field-type">integer</span></div>
+        <div class="field-row"><span class="field-name">consumo_alimento_kg</span><span class="field-type">numeric</span></div>
+        <div class="field-row"><span class="field-name field-fk">registrado_por</span><span class="field-type">FK → perfiles</span></div>
+        <div class="field-row"><span class="field-name">created_at</span><span class="field-type">timestamp</span></div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-card__head">
+        <h4>mortalidad</h4>
+        <span style="font-size:.7rem;color:var(--muted)">Bajas de aves</span>
+      </div>
+      <div class="table-card__body">
+        <div class="field-row"><span class="field-name field-pk">id</span><span class="field-type">uuid PK</span></div>
+        <div class="field-row"><span class="field-name field-fk">galpon_id</span><span class="field-type">FK → galpones</span></div>
+        <div class="field-row"><span class="field-name field-fk">lote_id</span><span class="field-type">FK → lotes</span></div>
+        <div class="field-row"><span class="field-name">fecha</span><span class="field-type">date</span></div>
+        <div class="field-row"><span class="field-name">cantidad_bajas</span><span class="field-type">integer</span></div>
+        <div class="field-row"><span class="field-name">causa</span><span class="field-type">enum (6 valores)</span></div>
+        <div class="field-row"><span class="field-name field-fk">registrado_por</span><span class="field-type">FK → perfiles</span></div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-card__head">
+        <h4>tratamientos</h4>
+        <span style="font-size:.7rem;color:var(--muted)">Salud e intervenciones</span>
+      </div>
+      <div class="table-card__body">
+        <div class="field-row"><span class="field-name field-pk">id</span><span class="field-type">uuid PK</span></div>
+        <div class="field-row"><span class="field-name field-fk">galpon_id</span><span class="field-type">FK → galpones</span></div>
+        <div class="field-row"><span class="field-name field-fk">lote_id</span><span class="field-type">FK → lotes</span></div>
+        <div class="field-row"><span class="field-name">tipo</span><span class="field-type">vacuna · med · otro</span></div>
+        <div class="field-row"><span class="field-name field-fk">insumo_id</span><span class="field-type">FK → insumos</span></div>
+        <div class="field-row"><span class="field-name">fecha_inicio/fin</span><span class="field-type">date</span></div>
+        <div class="field-row"><span class="field-name">estado</span><span class="field-type">activo | finalizado</span></div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-card__head">
+        <h4>insumos</h4>
+        <span style="font-size:.7rem;color:var(--muted)">Inventario / Suministros</span>
+      </div>
+      <div class="table-card__body">
+        <div class="field-row"><span class="field-name field-pk">id</span><span class="field-type">uuid PK</span></div>
+        <div class="field-row"><span class="field-name">nombre</span><span class="field-type">text</span></div>
+        <div class="field-row"><span class="field-name">categoria</span><span class="field-type">alimento · medicina…</span></div>
+        <div class="field-row"><span class="field-name">unidad_medida</span><span class="field-type">kg·g·litro·ml…</span></div>
+        <div class="field-row"><span class="field-name">stock_actual</span><span class="field-type">numeric</span></div>
+        <div class="field-row"><span class="field-name">stock_minimo</span><span class="field-type">integer</span></div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-card__head">
+        <h4>movimientos_insumos</h4>
+        <span style="font-size:.7rem;color:var(--muted)">Entradas y salidas</span>
+      </div>
+      <div class="table-card__body">
+        <div class="field-row"><span class="field-name field-pk">id</span><span class="field-type">uuid PK</span></div>
+        <div class="field-row"><span class="field-name field-fk">insumo_id</span><span class="field-type">FK → insumos</span></div>
+        <div class="field-row"><span class="field-name field-fk">proveedor_id</span><span class="field-type">FK → proveedores</span></div>
+        <div class="field-row"><span class="field-name">tipo</span><span class="field-type">entrada | salida</span></div>
+        <div class="field-row"><span class="field-name">cantidad</span><span class="field-type">numeric</span></div>
+        <div class="field-row"><span class="field-name">fecha</span><span class="field-type">date</span></div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-card__head">
+        <h4>proveedores</h4>
+        <span style="font-size:.7rem;color:var(--muted)">Proveedores externos</span>
+      </div>
+      <div class="table-card__body">
+        <div class="field-row"><span class="field-name field-pk">id</span><span class="field-type">uuid PK</span></div>
+        <div class="field-row"><span class="field-name">nombre</span><span class="field-type">text</span></div>
+        <div class="field-row"><span class="field-name">tipo_proveedor</span><span class="field-type">insumos·razas·ambos·otro</span></div>
+        <div class="field-row"><span class="field-name">telefono</span><span class="field-type">text</span></div>
+        <div class="field-row"><span class="field-name">correo</span><span class="field-type">text</span></div>
+        <div class="field-row"><span class="field-name">estado</span><span class="field-type">activo | inactivo</span></div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-card__head">
+        <h4>empleados</h4>
+        <span style="font-size:.7rem;color:var(--muted)">Personal de la granja</span>
+      </div>
+      <div class="table-card__body">
+        <div class="field-row"><span class="field-name field-pk">id</span><span class="field-type">uuid PK</span></div>
+        <div class="field-row"><span class="field-name">nombre_completo</span><span class="field-type">text</span></div>
+        <div class="field-row"><span class="field-name">documento_identidad</span><span class="field-type">text</span></div>
+        <div class="field-row"><span class="field-name">cargo</span><span class="field-type">text</span></div>
+        <div class="field-row"><span class="field-name">telefono</span><span class="field-type">text</span></div>
+        <div class="field-row"><span class="field-name">fecha_ingreso</span><span class="field-type">date</span></div>
+        <div class="field-row"><span class="field-name">estado</span><span class="field-type">activo | inactivo</span></div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-card__head">
+        <h4>auditoria_produccion</h4>
+        <span style="font-size:.7rem;color:var(--muted)">Trail de cambios producción</span>
+      </div>
+      <div class="table-card__body">
+        <div class="field-row"><span class="field-name field-pk">id</span><span class="field-type">uuid PK</span></div>
+        <div class="field-row"><span class="field-name field-fk">produccion_id</span><span class="field-type">FK → produccion</span></div>
+        <div class="field-row"><span class="field-name field-fk">editado_por</span><span class="field-type">FK → perfiles</span></div>
+        <div class="field-row"><span class="field-name">datos_anteriores</span><span class="field-type">jsonb</span></div>
+        <div class="field-row"><span class="field-name">datos_nuevos</span><span class="field-type">jsonb</span></div>
+        <div class="field-row"><span class="field-name">editado_at</span><span class="field-type">timestamp</span></div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-card__head">
+        <h4>razas / proveedores_razas / proveedores_insumos</h4>
+        <span style="font-size:.7rem;color:var(--muted)">Maestros y relaciones M2M</span>
+      </div>
+      <div class="table-card__body">
+        <div class="field-row"><span class="field-name">razas.nombre</span><span class="field-type">text (ej. Ponedoras)</span></div>
+        <div class="field-row"><span class="field-name field-fk">proveedores_razas</span><span class="field-type">proveedor ↔ raza</span></div>
+        <div class="field-row"><span class="field-name field-fk">proveedores_insumos</span><span class="field-type">proveedor ↔ insumo</span></div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      primaryColor: '#6366f1',
+      primaryTextColor: '#e2e8f0',
+      primaryBorderColor: '#4f46e5',
+      lineColor: '#6b7280',
+      secondaryColor: '#1e293b',
+      tertiaryColor: '#0f172a',
+      background: '#1a1d27',
+      mainBkg: '#1e2133',
+      nodeBorder: '#4f46e5',
+      clusterBkg: '#1a1d27',
+      titleColor: '#e2e8f0',
+      edgeLabelBackground: '#1a1d27',
+      fontFamily: 'Segoe UI, system-ui, sans-serif',
+    },
+    c4: {
+      diagramMarginX: 30,
+      diagramMarginY: 30,
+    },
+    er: {
+      diagramPadding: 20,
+      useMaxWidth: true,
+    },
+    flowchart: {
+      useMaxWidth: true,
+      htmlLabels: true,
+      curve: 'basis',
+    },
+  });
+
+  function showPanel(id) {
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('panel-' + id).classList.add('active');
+    event.target.classList.add('active');
+  }
+</script>
+</body>
+</html>

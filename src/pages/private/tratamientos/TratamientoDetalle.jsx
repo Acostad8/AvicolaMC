@@ -38,6 +38,7 @@ export default function TratamientoDetalle() {
         ['Fecha fin', formatDate(t.fecha_fin)],
         ['Tipo', getLabelFromValue(TIPOS_TRATAMIENTO, t.tipo)],
         ['Producto', t.nombre_producto],
+        ['Cantidad usada', t.cantidad_usada != null ? String(t.cantidad_usada) : '—'],
         ['Dosis/Aplicación', t.dosis_aplicacion],
         ['Responsable', t.responsable],
         ['Estado', t.estado],
@@ -74,6 +75,7 @@ export default function TratamientoDetalle() {
         <div><p className="text-xs text-stone-500">Tipo</p><p className="font-semibold">{getLabelFromValue(TIPOS_TRATAMIENTO, t.tipo)}</p></div>
         <div><p className="text-xs text-stone-500">Estado</p><StatusBadge status={t.estado} /></div>
         <div><p className="text-xs text-stone-500">Producto</p><p className="font-semibold">{t.nombre_producto}</p></div>
+        <div><p className="text-xs text-stone-500">Cantidad usada</p><p className="font-semibold">{t.cantidad_usada != null ? t.cantidad_usada : '—'}</p></div>
         <div><p className="text-xs text-stone-500">Responsable</p><p className="font-semibold">{t.responsable}</p></div>
         <div className="col-span-2"><p className="text-xs text-stone-500">Dosis / Aplicación</p><p>{t.dosis_aplicacion}</p></div>
         {t.observaciones && <div className="col-span-2"><p className="text-xs text-stone-500">Observaciones</p><p>{t.observaciones}</p></div>}

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -42,7 +43,8 @@ function SectionCard({ icon: Icon, title, children, gradient }) {
 }
 
 export default function Perfil() {
-  const { perfil, session, refreshPerfil } = useAuth()
+  const { perfil, session, signOut, refreshPerfil } = useAuth()
+  const navigate = useNavigate()
   const [showCurrent, setShowCurrent] = useState(false)
   const [showNew, setShowNew] = useState(false)
 
@@ -82,7 +84,14 @@ export default function Perfil() {
       const { error } = await supabase.auth.updateUser({ password: values.password_nueva })
       if (error) throw error
     },
-    onSuccess: () => { passForm.reset(); toast.success('Contraseña actualizada correctamente') },
+    onSuccess: () => {
+      passForm.reset()
+      toast.success('Contraseña actualizada correctamente')
+      setTimeout(async () => {
+        await signOut()
+        navigate('/login', { replace: true })
+      }, 1000)
+    },
     onError: e => toast.error(e.message),
   })
 

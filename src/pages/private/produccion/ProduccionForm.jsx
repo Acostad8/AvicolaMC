@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -13,7 +13,7 @@ import Textarea from '../../../components/ui/Textarea'
 import Button from '../../../components/ui/Button'
 import PageHeader from '../../../components/ui/PageHeader'
 import toast from 'react-hot-toast'
-import { Egg, AlertCircle, CheckCircle2, Info, Layers } from 'lucide-react'
+import { Egg, AlertCircle, CheckCircle2, Info, Layers, Clock, AlertTriangle } from 'lucide-react'
 
 const schema = z.object({
   fecha:               z.string().min(1, 'Requerido'),
@@ -22,6 +22,11 @@ const schema = z.object({
   consumo_alimento_kg: z.coerce.number().nonnegative('Debe ser 0 o más'),
   observaciones:       z.string().optional(),
 })
+
+function msDesdeCreacion(created_at) {
+  if (!created_at) return Infinity
+  return Date.now() - new Date(created_at).getTime()
+}
 
 /* Info box variants */
 function InfoBox({ type = 'info', icon: Icon, children }) {
@@ -43,12 +48,14 @@ function InfoBox({ type = 'info', icon: Icon, children }) {
 }
 
 export default function ProduccionForm() {
+  const { id } = useParams()
+  const isEdit = !!id
   const navigate = useNavigate()
   const { isAdmin, perfil } = useAuth()
   const qc = useQueryClient()
   const [posturaCalc, setPosturaCalc] = useState(null)
 
-  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm({
+  const { register, handleSubmit, watch, reset, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
     defaultValues: { fecha: new Date().toISOString().slice(0, 10) },
   })
@@ -57,6 +64,40 @@ export default function ProduccionForm() {
   const huevos   = watch('huevos_producidos')
   const fecha    = watch('fecha')
 
+  /* ── Registro existente (solo edición) ── */
+  const { data: registro } = useQuery({
+    queryKey: ['produccion-detalle', id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('produccion')
+        .select('*, galpon:galpones(nombre), lote:lotes(nombre_numero, cantidad_aves_actuales, raza:razas(nombre))')
+        .eq('id', id)
+        .single()
+      return data
+    },
+    enabled: isEdit,
+  })
+
+  /* Pre-cargar valores en edición */
+  useEffect(() => {
+    if (!registro) return
+    reset({
+      fecha:               registro.fecha,
+      galpon_id:           registro.galpon_id,
+      huevos_producidos:   registro.huevos_producidos,
+      consumo_alimento_kg: registro.consumo_alimento_kg ?? 0,
+      observaciones:       registro.observaciones || '',
+    })
+  }, [registro, reset])
+
+  /* ── Cálculo ventana de edición ── */
+  const msTranscurridos  = msDesdeCreacion(registro?.created_at)
+  const fueraDePlazo     = isEdit && !isAdmin && msTranscurridos > 24 * 3600 * 1000
+  const msRestantes      = Math.max(0, 24 * 3600 * 1000 - msTranscurridos)
+  const horasRestantes   = Math.floor(msRestantes / 3600000)
+  const minutosRestantes = Math.floor((msRestantes % 3600000) / 60000)
+
+  /* ── Galpones (solo creación) ── */
   const { data: galpones } = useQuery({
     queryKey: ['galpones-select', isAdmin, perfil?.id],
     queryFn: async () => {
@@ -65,9 +106,10 @@ export default function ProduccionForm() {
       const { data } = await q
       return data || []
     },
-    enabled: !!perfil,
+    enabled: !!perfil && !isEdit,
   })
 
+  /* ── Lote activo del galpón (solo creación) ── */
   const { data: loteActivo } = useQuery({
     queryKey: ['lote-activo', galponId],
     queryFn: async () => {
@@ -76,64 +118,139 @@ export default function ProduccionForm() {
         .eq('galpon_id', galponId).eq('estado', 'activo').maybeSingle()
       return data
     },
-    enabled: !!galponId,
+    enabled: !!galponId && !isEdit,
   })
 
+  /* ── Duplicado: en edición excluye el registro actual ── */
   const { data: duplicado } = useQuery({
-    queryKey: ['produccion-duplicado', galponId, fecha],
+    queryKey: ['produccion-duplicado', galponId, fecha, id],
     queryFn: async () => {
-      const { data } = await supabase.from('produccion')
-        .select('id').eq('galpon_id', galponId).eq('fecha', fecha).maybeSingle()
+      let q = supabase.from('produccion').select('id').eq('galpon_id', galponId).eq('fecha', fecha)
+      if (id) q = q.neq('id', id)
+      const { data } = await q.maybeSingle()
       return data
     },
     enabled: !!galponId && !!fecha,
   })
 
+  /* Aves de referencia para validación y postura */
+  const avesRef = isEdit
+    ? registro?.lote?.cantidad_aves_actuales
+    : loteActivo?.cantidad_aves_actuales
+
   useEffect(() => {
-    if (loteActivo?.cantidad_aves_actuales && Number(huevos) >= 0) {
-      setPosturaCalc(calcPostura(Number(huevos), loteActivo.cantidad_aves_actuales))
+    if (avesRef && Number(huevos) >= 0) {
+      setPosturaCalc(calcPostura(Number(huevos), avesRef))
     } else {
       setPosturaCalc(null)
     }
-  }, [huevos, loteActivo])
+  }, [huevos, avesRef])
 
-  const superaAves = loteActivo && Number(huevos) > loteActivo.cantidad_aves_actuales
+  const superaAves = avesRef && Number(huevos) > avesRef
 
+  /* ── Mutación ── */
   const mutation = useMutation({
     mutationFn: async (values) => {
-      if (!loteActivo)   throw new Error('No hay lote activo en este galpón')
-      if (duplicado)     throw new Error('Ya existe un registro de producción para este galpón en esta fecha')
-      if (superaAves)    throw new Error(`Los huevos (${values.huevos_producidos}) no pueden superar las aves activas (${loteActivo.cantidad_aves_actuales})`)
+      if (isEdit) {
+        if (fueraDePlazo) throw new Error('El período de edición de 24 horas ha vencido')
+        if (duplicado)    throw new Error('Ya existe un registro de producción para este galpón en esa fecha')
 
-      const postura = calcPostura(values.huevos_producidos, loteActivo.cantidad_aves_actuales)
-      const { error } = await supabase.from('produccion').insert({
-        ...values,
-        lote_id:             loteActivo.id,
-        porcentaje_postura:  postura,
-        registrado_por:      perfil.id,
-      })
-      if (error) throw error
+        const postura = calcPostura(values.huevos_producidos, registro.lote?.cantidad_aves_actuales)
+
+        /* Snapshots para auditoría */
+        const datosAnteriores = {
+          huevos_producidos:   registro.huevos_producidos,
+          consumo_alimento_kg: registro.consumo_alimento_kg ?? null,
+          porcentaje_postura:  registro.porcentaje_postura  ?? null,
+          observaciones:       registro.observaciones       ?? null,
+        }
+        const datosNuevos = {
+          huevos_producidos:   values.huevos_producidos,
+          consumo_alimento_kg: values.consumo_alimento_kg ?? null,
+          porcentaje_postura:  postura,
+          observaciones:       values.observaciones || null,
+        }
+
+        /* 1. Actualizar registro */
+        const { error: errUpd } = await supabase
+          .from('produccion')
+          .update({
+            huevos_producidos:   values.huevos_producidos,
+            consumo_alimento_kg: values.consumo_alimento_kg,
+            observaciones:       values.observaciones || null,
+            porcentaje_postura:  postura,
+          })
+          .eq('id', id)
+        if (errUpd) throw errUpd
+
+        /* 2. Insertar registro de auditoría */
+        const { error: errAud } = await supabase
+          .from('auditoria_produccion')
+          .insert({
+            produccion_id:    id,
+            editado_por:      perfil.id,
+            datos_anteriores: datosAnteriores,
+            datos_nuevos:     datosNuevos,
+          })
+        if (errAud) throw errAud
+
+      } else {
+        /* ── Creación ── */
+        if (!loteActivo) throw new Error('No hay lote activo en este galpón')
+        if (duplicado)   throw new Error('Ya existe un registro de producción para este galpón en esta fecha')
+        if (superaAves)  throw new Error(`Los huevos (${values.huevos_producidos}) no pueden superar las aves activas (${loteActivo.cantidad_aves_actuales})`)
+
+        const postura = calcPostura(values.huevos_producidos, loteActivo.cantidad_aves_actuales)
+        const { error } = await supabase.from('produccion').insert({
+          ...values,
+          lote_id:            loteActivo.id,
+          porcentaje_postura: postura,
+          registrado_por:     perfil.id,
+        })
+        if (error) throw error
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries(['produccion'])
-      toast.success('Producción registrada correctamente')
-      navigate('/dashboard/produccion')
+      qc.invalidateQueries(['produccion-detalle', id])
+      qc.invalidateQueries(['auditoria-produccion', id])
+      toast.success(isEdit ? 'Registro actualizado correctamente' : 'Producción registrada correctamente')
+      navigate(isEdit ? `/dashboard/produccion/${id}` : '/dashboard/produccion')
     },
     onError: e => toast.error(e.message || 'Error al guardar'),
   })
 
-  const isDisabled = !!duplicado || !loteActivo || !!superaAves
+  const isDisabled = fueraDePlazo || !!duplicado || (!isEdit && (!loteActivo || !!superaAves))
 
   return (
     <div className="max-w-xl">
       <PageHeader
-        title="Registrar producción"
+        title={isEdit ? 'Editar producción' : 'Registrar producción'}
         breadcrumbs={[
           { label: 'Dashboard', href: '/dashboard' },
           { label: 'Producción', href: '/dashboard/produccion' },
-          { label: 'Nuevo registro' },
+          { label: isEdit ? 'Editar' : 'Nuevo registro' },
         ]}
       />
+
+      {/* ── Banner: fuera de plazo ── */}
+      {isEdit && fueraDePlazo && (
+        <div className="mb-4 flex items-start gap-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3 text-sm text-red-700 dark:text-red-400">
+          <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+          <span>El período de edición de 24 horas ha vencido. Este registro ya no puede modificarse.</span>
+        </div>
+      )}
+
+      {/* ── Banner: tiempo restante ── */}
+      {isEdit && !fueraDePlazo && registro && (
+        <div className="mb-4 flex items-center gap-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+          <Clock className="h-4 w-4 flex-shrink-0" />
+          <span>
+            Tiempo restante para editar:{' '}
+            <strong>{horasRestantes}h {minutosRestantes}min</strong>
+          </span>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit(v => mutation.mutate(v))} className="card p-6 space-y-5">
 
@@ -143,29 +260,55 @@ export default function ProduccionForm() {
             <Egg className="h-5 w-5 text-white" aria-hidden="true" />
           </div>
           <div>
-            <p className="font-semibold text-stone-800 dark:text-stone-100 text-sm">Nuevo registro de producción</p>
-            <p className="text-xs text-stone-400 dark:text-stone-500">Completa todos los campos requeridos</p>
+            <p className="font-semibold text-stone-800 dark:text-stone-100 text-sm">
+              {isEdit ? 'Editar registro de producción' : 'Nuevo registro de producción'}
+            </p>
+            <p className="text-xs text-stone-400 dark:text-stone-500">
+              {isEdit ? 'Modifica los campos que necesites corregir' : 'Completa todos los campos requeridos'}
+            </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Input
-            label="Fecha"
-            type="date"
-            error={errors.fecha?.message}
-            {...register('fecha')}
-          />
-          <Select
-            label="Galpón"
-            options={(galpones || []).map(g => ({ value: g.id, label: g.nombre }))}
-            placeholder="Seleccionar galpón"
-            error={errors.galpon_id?.message}
-            {...register('galpon_id')}
-          />
-        </div>
+        {/* En edición: fecha editable, galpón/lote como info */}
+        {isEdit ? (
+          <>
+            <Input
+              label="Fecha"
+              type="date"
+              error={errors.fecha?.message}
+              disabled={fueraDePlazo}
+              {...register('fecha')}
+            />
+            <div className="bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-lg px-3 py-2 text-xs text-stone-600 dark:text-stone-400 space-y-0.5">
+              <p>Galpón: <strong className="text-stone-800 dark:text-stone-200">{registro?.galpon?.nombre || '—'}</strong></p>
+              <p>
+                Lote: <strong className="text-stone-800 dark:text-stone-200">{registro?.lote?.nombre_numero || '—'}</strong>
+                {registro?.lote?.raza?.nombre && <> · Raza: <strong className="text-stone-800 dark:text-stone-200">{registro.lote.raza.nombre}</strong></>}
+                {' · '}Aves activas: <strong className="text-stone-800 dark:text-stone-200">{avesRef?.toLocaleString('es-CO') ?? '—'}</strong>
+              </p>
+            </div>
+          </>
+        ) : (
+          /* En creación: fecha + selector de galpón */
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Fecha"
+              type="date"
+              error={errors.fecha?.message}
+              {...register('fecha')}
+            />
+            <Select
+              label="Galpón"
+              options={(galpones || []).map(g => ({ value: g.id, label: g.nombre }))}
+              placeholder="Seleccionar galpón"
+              error={errors.galpon_id?.message}
+              {...register('galpon_id')}
+            />
+          </div>
+        )}
 
-        {/* Lote info */}
-        {galponId && loteActivo && (
+        {/* Info de lote activo (solo creación) */}
+        {!isEdit && galponId && loteActivo && (
           <InfoBox type="info" icon={Layers}>
             <p className="font-semibold">Lote activo: {loteActivo.nombre_numero}</p>
             <p className="text-xs mt-0.5">
@@ -174,7 +317,7 @@ export default function ProduccionForm() {
             </p>
           </InfoBox>
         )}
-        {galponId && !loteActivo && (
+        {!isEdit && galponId && !loteActivo && (
           <InfoBox type="error">
             Este galpón no tiene un lote activo. Crea un lote antes de registrar producción.
           </InfoBox>
@@ -185,6 +328,7 @@ export default function ProduccionForm() {
           </InfoBox>
         )}
 
+        {/* Campos editables */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input
             label="Huevos producidos"
@@ -192,6 +336,7 @@ export default function ProduccionForm() {
             min="0"
             placeholder="0"
             error={errors.huevos_producidos?.message}
+            disabled={fueraDePlazo}
             {...register('huevos_producidos')}
           />
           <Input
@@ -201,17 +346,18 @@ export default function ProduccionForm() {
             min="0"
             placeholder="0.00"
             error={errors.consumo_alimento_kg?.message}
+            disabled={fueraDePlazo}
             {...register('consumo_alimento_kg')}
           />
         </div>
 
-        {superaAves && (
+        {superaAves && !fueraDePlazo && (
           <InfoBox type="error">
-            Los huevos producidos no pueden superar las aves activas ({loteActivo?.cantidad_aves_actuales?.toLocaleString('es-CO')}).
+            Los huevos producidos no pueden superar las aves activas ({avesRef?.toLocaleString('es-CO')}).
           </InfoBox>
         )}
 
-        {posturaCalc !== null && !superaAves && (
+        {posturaCalc !== null && !superaAves && !fueraDePlazo && (
           <InfoBox type="success">
             <span>% de postura calculado: </span>
             <strong className="text-base">{posturaCalc}%</strong>
@@ -225,23 +371,26 @@ export default function ProduccionForm() {
           label="Observaciones (opcional)"
           placeholder="Anota cualquier novedad relevante del día…"
           rows={3}
+          disabled={fueraDePlazo}
           {...register('observaciones')}
         />
 
         <div className="flex gap-3 pt-1 border-t border-stone-100 dark:border-stone-800">
-          <Button
-            type="submit"
-            loading={mutation.isPending || isSubmitting}
-            disabled={isDisabled}
-          >
-            Guardar registro
-          </Button>
+          {!fueraDePlazo && (
+            <Button
+              type="submit"
+              loading={mutation.isPending || isSubmitting}
+              disabled={isDisabled}
+            >
+              {isEdit ? 'Guardar cambios' : 'Guardar registro'}
+            </Button>
+          )}
           <Button
             type="button"
             variant="secondary"
-            onClick={() => navigate('/dashboard/produccion')}
+            onClick={() => navigate(isEdit ? `/dashboard/produccion/${id}` : '/dashboard/produccion')}
           >
-            Cancelar
+            {fueraDePlazo ? 'Volver' : 'Cancelar'}
           </Button>
         </div>
       </form>

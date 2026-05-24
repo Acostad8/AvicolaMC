@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../context/AuthContext'
@@ -14,7 +14,7 @@ import toast from 'react-hot-toast'
 import {
   CheckCircle, PauseCircle, Layers, Bird, Building2,
   Calendar, TrendingDown, Activity, Clock, AlertTriangle,
-  CheckCircle2, Info,
+  CheckCircle2, Info, Pencil, PlayCircle,
 } from 'lucide-react'
 
 /* ── Scroll animation hook ── */
@@ -151,7 +151,11 @@ export default function LoteDetalle() {
     onSuccess: (_, nuevoEstado) => {
       qc.invalidateQueries(['lote', id])
       qc.invalidateQueries(['lotes'])
-      toast.success(nuevoEstado === 'finalizado' ? 'Lote finalizado correctamente' : 'Lote suspendido')
+      toast.success(
+        nuevoEstado === 'finalizado' ? 'Lote finalizado correctamente'
+        : nuevoEstado === 'activo'   ? 'Lote reactivado correctamente'
+        : 'Lote suspendido'
+      )
       setConfirmAction(null)
     },
     onError: e => toast.error(e.message || 'Error al actualizar'),
@@ -190,9 +194,17 @@ export default function LoteDetalle() {
         ]}
         actions={isAdmin && (esActivo || esSuspendido) && (
           <div className="flex gap-2">
+            <Link to={`/dashboard/lotes/${id}/editar`}>
+              <Button variant="secondary" size="sm" icon={Pencil}>Editar</Button>
+            </Link>
             {esActivo && (
               <Button variant="secondary" size="sm" icon={PauseCircle} onClick={() => setConfirmAction('suspendido')}>
                 Suspender
+              </Button>
+            )}
+            {esSuspendido && (
+              <Button variant="secondary" size="sm" icon={PlayCircle} onClick={() => setConfirmAction('activo')}>
+                Reactivar
               </Button>
             )}
             <Button variant="danger" size="sm" icon={CheckCircle} onClick={() => setConfirmAction('finalizado')}>
@@ -337,6 +349,15 @@ export default function LoteDetalle() {
         title="Suspender lote"
         message={`¿Suspender el lote "${lote.nombre_numero}"? No se podrán registrar producción ni mortalidad mientras esté suspendido.`}
         confirmLabel="Sí, suspender"
+      />
+      <ConfirmModal
+        open={confirmAction === 'activo'}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={() => mutation.mutate('activo')}
+        loading={mutation.isPending}
+        title="Reactivar lote"
+        message={`¿Reactivar el lote "${lote.nombre_numero}"? Volverá a estado activo y se podrán registrar producción, mortalidad y tratamientos nuevamente.`}
+        confirmLabel="Sí, reactivar"
       />
     </div>
   )

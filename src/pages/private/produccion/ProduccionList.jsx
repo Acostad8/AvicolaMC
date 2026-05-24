@@ -4,8 +4,10 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../context/AuthContext'
 import { useA11y } from '../../../context/AccessibilityContext'
+import { useConfig } from '../../../context/ConfigContext'
 import { formatDate, formatNumber, downloadCSV } from '../../../lib/utils'
-import { Plus, Download, Eye, Egg, TrendingUp, Wheat, Calendar, BarChart2, X, Filter } from 'lucide-react'
+import { Plus, Download, Eye, Pencil, Egg, TrendingUp, Wheat, Calendar, BarChart2, X, Filter } from 'lucide-react'
+import { differenceInHours, parseISO } from 'date-fns'
 import Button from '../../../components/ui/Button'
 import PageHeader from '../../../components/ui/PageHeader'
 import Pagination from '../../../components/ui/Pagination'
@@ -16,12 +18,14 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
 
-/* ── Postura badge ── */
+/* ── Postura badge (umbrales desde Configuración) ── */
 function PosturaBadge({ pct }) {
+  const { config } = useConfig()
+  const { postura_excelente: exc, postura_buena: bue, postura_regular: reg } = config.produccion
   const n = parseFloat(pct) || 0
-  const cls = n >= 90 ? 'text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30'
-    : n >= 75 ? 'text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30'
-    : n >= 50 ? 'text-yellow-700 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30'
+  const cls = n >= exc ? 'text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30'
+    : n >= bue ? 'text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30'
+    : n >= reg ? 'text-yellow-700 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30'
     : 'text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/30'
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${cls}`}>
@@ -71,6 +75,7 @@ export default function ProduccionList() {
 
   const [filterGalpon, setFilterGalpon] = useState('')
   const [filterRaza, setFilterRaza]     = useState('')
+  const [filterLote, setFilterLote]     = useState('')
   const [filterDesde, setFilterDesde]   = useState('')
   const [filterHasta, setFilterHasta]   = useState('')
   const [page, setPage]       = useState(1)
@@ -100,9 +105,27 @@ export default function ProduccionList() {
     enabled: !!perfil,
   })
 
-  /* Fetch produccion (server filters: galpon, fechas) */
+  /* Fetch lotes filtered by selected galpón */
+  const { data: lotes } = useQuery({
+    queryKey: ['lotes-select-prod', filterGalpon, isAdmin, perfil?.id],
+    queryFn: async () => {
+      let q = supabase.from('lotes').select('id, nombre_numero, galpon_id').order('nombre_numero')
+      if (filterGalpon) {
+        q = q.eq('galpon_id', filterGalpon)
+      } else if (!isAdmin && galpones) {
+        const ids = galpones.map(g => g.id)
+        if (ids.length === 0) return []
+        q = q.in('galpon_id', ids)
+      }
+      const { data } = await q
+      return data || []
+    },
+    enabled: !!perfil,
+  })
+
+  /* Fetch produccion (server filters: galpon, lote, fechas) */
   const { data: rawData, isLoading } = useQuery({
-    queryKey: ['produccion', isAdmin, perfil?.id, filterGalpon, filterDesde, filterHasta],
+    queryKey: ['produccion', isAdmin, perfil?.id, filterGalpon, filterLote, filterDesde, filterHasta],
     queryFn: async () => {
       let q = supabase.from('produccion').select(`
         id, fecha, huevos_producidos, porcentaje_postura, consumo_alimento_kg, observaciones, created_at,
@@ -117,6 +140,7 @@ export default function ProduccionList() {
         q = q.in('galpon_id', ids)
       }
       if (filterGalpon) q = q.eq('galpon_id', filterGalpon)
+      if (filterLote)   q = q.eq('lote_id', filterLote)
       if (filterDesde)  q = q.gte('fecha', filterDesde)
       if (filterHasta)  q = q.lte('fecha', filterHasta)
 
@@ -169,14 +193,15 @@ export default function ProduccionList() {
 
   /* Active filters */
   const activeFilters = [
-    filterGalpon && { label: `Galpón: ${galpones?.find(g => g.id === filterGalpon)?.nombre}`, clear: () => { setFilterGalpon(''); setPage(1) } },
+    filterGalpon && { label: `Galpón: ${galpones?.find(g => g.id === filterGalpon)?.nombre}`, clear: () => { setFilterGalpon(''); setFilterLote(''); setPage(1) } },
+    filterLote   && { label: `Lote: ${lotes?.find(l => l.id === filterLote)?.nombre_numero}`,  clear: () => { setFilterLote('');   setPage(1) } },
     filterRaza   && { label: `Raza: ${filterRaza}`,   clear: () => { setFilterRaza('');   setPage(1) } },
     filterDesde  && { label: `Desde: ${filterDesde}`, clear: () => { setFilterDesde('');  setPage(1) } },
     filterHasta  && { label: `Hasta: ${filterHasta}`, clear: () => { setFilterHasta('');  setPage(1) } },
   ].filter(Boolean)
 
   function clearAllFilters() {
-    setFilterGalpon(''); setFilterRaza(''); setFilterDesde(''); setFilterHasta(''); setPage(1)
+    setFilterGalpon(''); setFilterRaza(''); setFilterLote(''); setFilterDesde(''); setFilterHasta(''); setPage(1)
   }
 
   function handleExport() {
@@ -232,17 +257,30 @@ export default function ProduccionList() {
             </button>
           )}
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {/* Galpón */}
           <div>
             <label className="label text-xs">Galpón</label>
             <select
               className="input-base"
               value={filterGalpon}
-              onChange={e => { setFilterGalpon(e.target.value); setPage(1) }}
+              onChange={e => { setFilterGalpon(e.target.value); setFilterLote(''); setPage(1) }}
             >
               <option value="">Todos</option>
               {(galpones || []).map(g => <option key={g.id} value={g.id}>{g.nombre}</option>)}
+            </select>
+          </div>
+          {/* Lote */}
+          <div>
+            <label className="label text-xs">Lote</label>
+            <select
+              className="input-base"
+              value={filterLote}
+              onChange={e => { setFilterLote(e.target.value); setPage(1) }}
+              disabled={!lotes?.length}
+            >
+              <option value="">Todos los lotes</option>
+              {(lotes || []).map(l => <option key={l.id} value={l.id}>{l.nombre_numero}</option>)}
             </select>
           </div>
           {/* Raza */}
@@ -411,9 +449,20 @@ export default function ProduccionList() {
                       {r.registrado?.nombre_completo?.split(' ')[0] || '—'}
                     </td>
                     <td className="px-4 py-3">
-                      <Link to={`/dashboard/produccion/${r.id}`}>
-                        <Button variant="ghost" size="sm" icon={Eye}>Ver</Button>
-                      </Link>
+                      <div className="flex items-center gap-1.5">
+                        <Link to={`/dashboard/produccion/${r.id}`}>
+                          <Button variant="ghost" size="sm" icon={Eye}>Ver</Button>
+                        </Link>
+                        {(isAdmin || differenceInHours(new Date(), parseISO(r.created_at)) < 24) && (
+                          <Link to={`/dashboard/produccion/${r.id}/editar`}>
+                            <Button variant="ghost" size="sm" icon={Pencil}
+                              className="text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                            >
+                              Editar
+                            </Button>
+                          </Link>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

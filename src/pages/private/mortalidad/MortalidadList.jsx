@@ -5,7 +5,7 @@ import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../context/AuthContext'
 import { useA11y } from '../../../context/AccessibilityContext'
 import { formatDate, formatNumber, downloadCSV, getLabelFromValue, CAUSAS_MORTALIDAD } from '../../../lib/utils'
-import { Plus, Download, Eye, Skull, TrendingDown, CalendarDays, AlertTriangle, BarChart2 } from 'lucide-react'
+import { Plus, Download, Eye, Pencil, Skull, TrendingDown, CalendarDays, AlertTriangle, BarChart2, X, Filter } from 'lucide-react'
 import Button from '../../../components/ui/Button'
 import PageHeader from '../../../components/ui/PageHeader'
 import Pagination from '../../../components/ui/Pagination'
@@ -58,6 +58,7 @@ export default function MortalidadList() {
   useA11y() // ensure context is available; dark not needed here but keeps pattern consistent
 
   const [filterGalpon, setFilterGalpon] = useState('')
+  const [filterLote, setFilterLote]     = useState('')
   const [filterCausa, setFilterCausa]   = useState('')
   const [filterDesde, setFilterDesde]   = useState('')
   const [filterHasta, setFilterHasta]   = useState('')
@@ -75,8 +76,25 @@ export default function MortalidadList() {
     enabled: !!perfil,
   })
 
+  const { data: lotes } = useQuery({
+    queryKey: ['lotes-select-mort', filterGalpon, isAdmin, perfil?.id],
+    queryFn: async () => {
+      let q = supabase.from('lotes').select('id, nombre_numero, galpon_id').order('nombre_numero')
+      if (filterGalpon) {
+        q = q.eq('galpon_id', filterGalpon)
+      } else if (!isAdmin && galpones) {
+        const ids = galpones.map(g => g.id)
+        if (ids.length === 0) return []
+        q = q.in('galpon_id', ids)
+      }
+      const { data } = await q
+      return data || []
+    },
+    enabled: !!perfil,
+  })
+
   const { data, isLoading } = useQuery({
-    queryKey: ['mortalidad', isAdmin, perfil?.id, filterGalpon, filterDesde, filterHasta, filterCausa],
+    queryKey: ['mortalidad', isAdmin, perfil?.id, filterGalpon, filterLote, filterDesde, filterHasta, filterCausa],
     queryFn: async () => {
       let q = supabase
         .from('mortalidad')
@@ -88,6 +106,7 @@ export default function MortalidadList() {
         q = q.in('galpon_id', ids)
       }
       if (filterGalpon) q = q.eq('galpon_id', filterGalpon)
+      if (filterLote)   q = q.eq('lote_id', filterLote)
       if (filterDesde)  q = q.gte('fecha', filterDesde)
       if (filterHasta)  q = q.lte('fecha', filterHasta)
       if (filterCausa)  q = q.eq('causa', filterCausa)
@@ -109,6 +128,18 @@ export default function MortalidadList() {
     const causaFrecuente = Object.entries(causaCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
     return { totalBajas, promDiario, registros: list.length, causaFrecuente }
   }, [data])
+
+  const activeFilters = [
+    filterGalpon && { label: `Galpón: ${galpones?.find(g => g.id === filterGalpon)?.nombre}`, clear: () => { setFilterGalpon(''); setFilterLote(''); setPage(1) } },
+    filterLote   && { label: `Lote: ${lotes?.find(l => l.id === filterLote)?.nombre_numero}`,  clear: () => { setFilterLote('');   setPage(1) } },
+    filterCausa  && { label: `Causa: ${getLabelFromValue(CAUSAS_MORTALIDAD, filterCausa)}`,    clear: () => { setFilterCausa('');  setPage(1) } },
+    filterDesde  && { label: `Desde: ${filterDesde}`, clear: () => { setFilterDesde('');  setPage(1) } },
+    filterHasta  && { label: `Hasta: ${filterHasta}`, clear: () => { setFilterHasta('');  setPage(1) } },
+  ].filter(Boolean)
+
+  function clearAllFilters() {
+    setFilterGalpon(''); setFilterLote(''); setFilterCausa(''); setFilterDesde(''); setFilterHasta(''); setPage(1)
+  }
 
   const totalPages = Math.ceil((data?.length || 0) / pageSize)
   const paginated  = (data || []).slice((page - 1) * pageSize, page * pageSize)
@@ -175,17 +206,38 @@ export default function MortalidadList() {
       </div>
 
       {/* ── Filter bar ── */}
-      <div className="card p-4">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="card p-4 space-y-3">
+        <div className="flex items-center gap-2 mb-1">
+          <Filter className="h-4 w-4 text-stone-400 dark:text-stone-500" aria-hidden="true" />
+          <span className="text-sm font-semibold text-stone-700 dark:text-stone-300">Filtros</span>
+          {activeFilters.length > 0 && (
+            <button onClick={clearAllFilters} className="ml-auto text-xs text-stone-400 dark:text-stone-500 hover:text-red-500 dark:hover:text-red-400 transition-colors">
+              Limpiar todo
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <div>
             <label className="label text-xs">Galpón</label>
             <select
               className="input-base"
               value={filterGalpon}
-              onChange={e => { setFilterGalpon(e.target.value); setPage(1) }}
+              onChange={e => { setFilterGalpon(e.target.value); setFilterLote(''); setPage(1) }}
             >
               <option value="">Todos</option>
               {(galpones || []).map(g => <option key={g.id} value={g.id}>{g.nombre}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="label text-xs">Lote</label>
+            <select
+              className="input-base"
+              value={filterLote}
+              onChange={e => { setFilterLote(e.target.value); setPage(1) }}
+              disabled={!lotes?.length}
+            >
+              <option value="">Todos los lotes</option>
+              {(lotes || []).map(l => <option key={l.id} value={l.id}>{l.nombre_numero}</option>)}
             </select>
           </div>
           <div>
@@ -218,6 +270,18 @@ export default function MortalidadList() {
             />
           </div>
         </div>
+        {activeFilters.length > 0 && (
+          <div className="flex flex-wrap gap-2 pt-1">
+            {activeFilters.map((f, i) => (
+              <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-400 rounded-full text-xs font-medium">
+                {f.label}
+                <button onClick={f.clear} className="hover:text-primary-900 dark:hover:text-primary-200 ml-0.5" aria-label="Quitar filtro">
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── Table ── */}
@@ -262,9 +326,16 @@ export default function MortalidadList() {
                       {r.registrado?.nombre_completo || '—'}
                     </td>
                     <td className="px-4 py-3">
-                      <Link to={`/dashboard/mortalidad/${r.id}`}>
-                        <Button variant="ghost" size="sm" icon={Eye}>Ver</Button>
-                      </Link>
+                      <div className="flex items-center gap-1">
+                        <Link to={`/dashboard/mortalidad/${r.id}`}>
+                          <Button variant="ghost" size="sm" icon={Eye}>Ver</Button>
+                        </Link>
+                        {r.created_at && (Date.now() - new Date(r.created_at).getTime()) <= 24 * 3600 * 1000 && (
+                          <Link to={`/dashboard/mortalidad/${r.id}/editar`}>
+                            <Button variant="ghost" size="sm" icon={Pencil}>Editar</Button>
+                          </Link>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

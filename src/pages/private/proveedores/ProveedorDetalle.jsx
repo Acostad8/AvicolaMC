@@ -1,11 +1,11 @@
-import { Link, useParams } from 'react-router-dom'
+import {  useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
 import { getLabelFromValue, TIPOS_PROVEEDOR } from '../../../lib/utils'
 import PageHeader from '../../../components/ui/PageHeader'
 import { StatusBadge } from '../../../components/ui/Badge'
-import Button from '../../../components/ui/Button'
-import { Pencil, Package, Bird } from 'lucide-react'
+// import Button from '../../../components/ui/Button'
+import {  Package, Bird } from 'lucide-react'
 
 export default function ProveedorDetalle() {
   const { id } = useParams()
@@ -48,11 +48,11 @@ export default function ProveedorDetalle() {
       <PageHeader
         title={proveedor.nombre}
         breadcrumbs={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Proveedores', href: '/dashboard/proveedores' }, { label: proveedor.nombre }]}
-        actions={
-          <Link to={`/dashboard/proveedores/${id}/editar`}>
-            <Button variant="secondary" size="sm" icon={Pencil}>Editar</Button>
-          </Link>
-        }
+        // actions={
+        //   <Link to={`/dashboard/proveedores/${id}/editar`}>
+        //     <Button variant="secondary" size="sm" icon={Pencil}>Editar</Button>
+        //   </Link>
+        // }
       />
 
       <div className="card p-6 grid grid-cols-2 gap-4">
