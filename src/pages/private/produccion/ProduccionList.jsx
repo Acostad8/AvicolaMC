@@ -6,8 +6,7 @@ import { useAuth } from '../../../context/AuthContext'
 import { useA11y } from '../../../context/AccessibilityContext'
 import { useConfig } from '../../../context/ConfigContext'
 import { formatDate, formatNumber, downloadCSV } from '../../../lib/utils'
-import { Plus, Download, Eye, Pencil, Egg, TrendingUp, Wheat, Calendar, BarChart2, X, Filter } from 'lucide-react'
-import { differenceInHours, parseISO } from 'date-fns'
+import { Plus, Download, Eye, Pencil, Egg, TrendingUp, Wheat, Calendar, BarChart2, X, Filter, Lock, Clock } from 'lucide-react'
 import Button from '../../../components/ui/Button'
 import PageHeader from '../../../components/ui/PageHeader'
 import Pagination from '../../../components/ui/Pagination'
@@ -17,6 +16,12 @@ import {
   AreaChart, Area, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
+
+/* ── 24h edit window check ── */
+function withinEditWindow(created_at) {
+  if (!created_at) return false
+  return Date.now() - new Date(created_at).getTime() < 24 * 3600 * 1000
+}
 
 /* ── Postura badge (umbrales desde Configuración) ── */
 function PosturaBadge({ pct }) {
@@ -453,7 +458,7 @@ export default function ProduccionList() {
                         <Link to={`/dashboard/produccion/${r.id}`}>
                           <Button variant="ghost" size="sm" icon={Eye}>Ver</Button>
                         </Link>
-                        {(isAdmin || differenceInHours(new Date(), parseISO(r.created_at)) < 24) && (
+                        {isAdmin ? (
                           <Link to={`/dashboard/produccion/${r.id}/editar`}>
                             <Button variant="ghost" size="sm" icon={Pencil}
                               className="text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20"
@@ -461,6 +466,23 @@ export default function ProduccionList() {
                               Editar
                             </Button>
                           </Link>
+                        ) : withinEditWindow(r.created_at) ? (
+                          <Link to={`/dashboard/produccion/${r.id}/editar`}>
+                            <Button variant="ghost" size="sm" icon={Clock}
+                              className="text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                              title="Editar — ventana de 24 h activa"
+                            >
+                              Editar
+                            </Button>
+                          </Link>
+                        ) : (
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-stone-400 dark:text-stone-500 bg-stone-100 dark:bg-stone-800 cursor-not-allowed select-none"
+                            title="El período de edición de 24 horas ha finalizado"
+                          >
+                            <Lock className="h-3 w-3" />
+                            Bloqueado
+                          </span>
                         )}
                       </div>
                     </td>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -24,7 +24,7 @@ const schema = z.object({
 })
 
 function msDesdeCreacion(created_at) {
-  if (!created_at) return Infinity
+  if (!created_at) return 0          // mientras carga: no bloquear todavía
   return Date.now() - new Date(created_at).getTime()
 }
 
@@ -219,6 +219,16 @@ export default function ProduccionForm() {
     },
     onError: e => toast.error(e.message || 'Error al guardar'),
   })
+
+  /* Redirigir automáticamente si un no-admin intenta editar un registro bloqueado */
+  const redirectedRef = useRef(false)
+  useEffect(() => {
+    if (isEdit && !isAdmin && registro && fueraDePlazo && !redirectedRef.current) {
+      redirectedRef.current = true
+      toast.error('El período de edición de 24 horas ha vencido.')
+      navigate(`/dashboard/produccion/${id}`, { replace: true })
+    }
+  }, [isEdit, isAdmin, registro, fueraDePlazo, navigate, id])
 
   const isDisabled = fueraDePlazo || !!duplicado || (!isEdit && (!loteActivo || !!superaAves))
 

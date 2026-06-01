@@ -89,7 +89,6 @@ export default function ProveedoresList() {
                           <Button variant="ghost" size="sm" icon={Pencil}>Editar</Button>
                         </Link>
                     </td>
-                    
                   </tr>
                 ))}
               </tbody>

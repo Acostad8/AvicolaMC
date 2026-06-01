@@ -13,21 +13,19 @@ alter table public.auditoria_produccion enable row level security;
 -- Admins leen todos los registros de auditoría
 create policy "Admin lee auditoria produccion"
   on public.auditoria_produccion for select
-  using (
-    exists (
-      select 1 from public.perfiles
-      where id = auth.uid() and rol = 'admin'
-    )
-  );
+  to authenticated
+  using (is_admin());
 
 -- Cualquier usuario autenticado puede insertar su propio registro de auditoría
 create policy "Insertar auditoria produccion propia"
   on public.auditoria_produccion for insert
+  to authenticated
   with check (editado_por = auth.uid());
 
 -- Encargados leen auditoría de registros en sus galpones
 create policy "Encargado lee auditoria de su galpon"
   on public.auditoria_produccion for select
+  to authenticated
   using (
     exists (
       select 1 from public.produccion p
