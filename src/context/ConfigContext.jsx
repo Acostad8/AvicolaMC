@@ -17,6 +17,13 @@ export const CONFIG_DEFAULTS = {
     postura_regular:    50,
     alerta_mortalidad:   5,
   },
+  notificaciones: {
+    habilitadas:   true,   // interruptor maestro
+    sistema:       true,   // confirmaciones de acciones (guardar, editar, eliminar)
+    produccion:    true,   // alertas de producción (postura baja, registro diario)
+    mortalidad:    true,   // alertas de mortalidad alta
+    recordatorios: true,   // recordatorios y avisos del sistema
+  },
 }
 
 function load() {
@@ -25,8 +32,9 @@ function load() {
     if (!raw) return CONFIG_DEFAULTS
     const parsed = JSON.parse(raw)
     return {
-      granja:     { ...CONFIG_DEFAULTS.granja,     ...parsed.granja },
-      produccion: { ...CONFIG_DEFAULTS.produccion, ...parsed.produccion },
+      granja:         { ...CONFIG_DEFAULTS.granja,         ...parsed.granja },
+      produccion:     { ...CONFIG_DEFAULTS.produccion,     ...parsed.produccion },
+      notificaciones: { ...CONFIG_DEFAULTS.notificaciones, ...parsed.notificaciones },
     }
   } catch {
     return CONFIG_DEFAULTS

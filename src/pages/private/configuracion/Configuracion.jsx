@@ -7,6 +7,8 @@ import {
   Save, Sun, Moon, Type, ZapOff,
   Contrast, CheckCircle2, TrendingUp, AlertCircle,
   Phone, Mail, MapPin, Hash, Info,
+  Bell, BellOff, BellRing, Trash2,
+  ShieldCheck, Package, Activity, CalendarClock,
 } from 'lucide-react'
 import PageHeader from '../../../components/ui/PageHeader'
 import Button from '../../../components/ui/Button'
@@ -14,15 +16,17 @@ import Input from '../../../components/ui/Input'
 import { useA11y } from '../../../context/AccessibilityContext'
 import { useConfig } from '../../../context/ConfigContext'
 import { useAuth } from '../../../context/AuthContext'
+import { useNotifications } from '../../../context/NotificationsContext'
 import RazasList from '../razas/RazasList'
 import toast from 'react-hot-toast'
 
 /* ── Tabs ── */
 const TABS = [
-  { id: 'empresa',    label: 'Empresa',    icon: Building2 },
-  { id: 'produccion', label: 'Producción', icon: Egg },
-  { id: 'apariencia', label: 'Apariencia', icon: Palette },
-  { id: 'razas',      label: 'Razas',      icon: Bird },
+  { id: 'empresa',        label: 'Empresa',        icon: Building2 },
+  { id: 'produccion',     label: 'Producción',     icon: Egg },
+  { id: 'apariencia',     label: 'Apariencia',     icon: Palette },
+  { id: 'notificaciones', label: 'Notificaciones', icon: Bell },
+  { id: 'razas',          label: 'Razas',          icon: Bird },
 ]
 
 /* ── Schema empresa ── */
@@ -323,6 +327,191 @@ function TabProduccion() {
 }
 
 /* ═══════════════════════════════════════════════
+   SECCIÓN: Notificaciones
+═══════════════════════════════════════════════ */
+const NOTIF_CATEGORIES = [
+  {
+    key:         'sistema',
+    label:       'Sistema',
+    description: 'Confirmaciones al guardar, editar o eliminar registros.',
+    icon:        ShieldCheck,
+    gradient:    'from-blue-400 to-blue-600',
+  },
+  {
+    key:         'produccion',
+    label:       'Producción',
+    description: 'Alertas de postura baja y avisos de registro de producción.',
+    icon:        Package,
+    gradient:    'from-amber-400 to-amber-600',
+  },
+  {
+    key:         'mortalidad',
+    label:       'Mortalidad',
+    description: 'Alertas cuando la mortalidad supera el umbral configurado.',
+    icon:        Activity,
+    gradient:    'from-red-400 to-red-600',
+  },
+  {
+    key:         'recordatorios',
+    label:       'Recordatorios',
+    description: 'Avisos de ventanas de edición y recordatorios del sistema.',
+    icon:        CalendarClock,
+    gradient:    'from-violet-400 to-violet-600',
+  },
+]
+
+function TabNotificaciones() {
+  const { config, saveSection } = useConfig()
+  const { notifications, clearAll, unreadCount } = useNotifications()
+  const prefs = config.notificaciones || {}
+
+  function setMaster(val) {
+    saveSection('notificaciones', { habilitadas: val })
+    toast.success(val ? 'Notificaciones activadas' : 'Notificaciones desactivadas')
+  }
+
+  function setCategory(key, val) {
+    saveSection('notificaciones', { [key]: val })
+  }
+
+  function handleClearHistory() {
+    clearAll()
+    toast.success('Historial de notificaciones eliminado')
+  }
+
+  const globalOn = prefs.habilitadas !== false
+
+  return (
+    <div className="space-y-6">
+
+      {/* ── Interruptor maestro ── */}
+      <div>
+        <div className="flex items-center gap-3 pb-4 border-b border-stone-100 dark:border-stone-800 mb-4">
+          <div className={`w-10 h-10 bg-gradient-to-br ${globalOn ? 'from-primary-400 to-primary-600' : 'from-stone-400 to-stone-600'} rounded-xl flex items-center justify-center shadow-sm transition-all`}>
+            {globalOn
+              ? <BellRing className="h-5 w-5 text-white" />
+              : <BellOff  className="h-5 w-5 text-white" />
+            }
+          </div>
+          <div>
+            <p className="font-semibold text-stone-800 dark:text-stone-100 text-sm">Notificaciones y alertas</p>
+            <p className="text-xs text-stone-400 dark:text-stone-500">
+              {globalOn ? 'Las notificaciones están activas' : 'Todas las notificaciones están desactivadas'}
+            </p>
+          </div>
+        </div>
+
+        <div className={`rounded-2xl border-2 p-4 transition-all ${globalOn ? 'border-primary-200 dark:border-primary-900/50 bg-primary-50/50 dark:bg-primary-900/10' : 'border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/30'}`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-stone-800 dark:text-stone-100">
+                {globalOn ? 'Notificaciones activadas' : 'Notificaciones desactivadas'}
+              </p>
+              <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+                {globalOn
+                  ? 'Recibes alertas y confirmaciones en tiempo real.'
+                  : 'No aparecerán alertas ni toasts mientras esté desactivado.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={globalOn}
+              onClick={() => setMaster(!globalOn)}
+              className={`relative inline-flex h-7 w-13 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${
+                globalOn ? 'bg-primary-500' : 'bg-stone-300 dark:bg-stone-600'
+              }`}
+              style={{ width: '3.25rem' }}
+            >
+              <span className={`inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ${globalOn ? 'translate-x-6' : 'translate-x-0'}`} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Categorías ── */}
+      <div>
+        <div className="flex items-center gap-3 pb-4 border-b border-stone-100 dark:border-stone-800 mb-1">
+          <div className="w-10 h-10 bg-gradient-to-br from-stone-400 to-stone-600 rounded-xl flex items-center justify-center shadow-sm">
+            <Bell className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <p className="font-semibold text-stone-800 dark:text-stone-100 text-sm">Tipos de notificación</p>
+            <p className="text-xs text-stone-400 dark:text-stone-500">Activa o desactiva cada categoría de forma independiente</p>
+          </div>
+        </div>
+
+        <div className={`divide-y divide-stone-100 dark:divide-stone-800 transition-opacity ${!globalOn ? 'opacity-40 pointer-events-none select-none' : ''}`}>
+          {NOTIF_CATEGORIES.map(cat => {
+            const enabled = prefs[cat.key] !== false
+            const Icon = cat.icon
+            return (
+              <div key={cat.key} className="flex items-center justify-between gap-4 py-3.5">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`w-9 h-9 bg-gradient-to-br ${cat.gradient} rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm`}>
+                    <Icon className="h-4 w-4 text-white" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-stone-800 dark:text-stone-100">{cat.label}</p>
+                    <p className="text-xs text-stone-400 dark:text-stone-500 leading-snug">{cat.description}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={enabled}
+                  onClick={() => setCategory(cat.key, !enabled)}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${
+                    enabled ? 'bg-primary-500' : 'bg-stone-200 dark:bg-stone-700'
+                  }`}
+                >
+                  <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ${enabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* ── Historial ── */}
+      <div>
+        <div className="flex items-center gap-3 pb-4 border-b border-stone-100 dark:border-stone-800 mb-4">
+          <div className="w-10 h-10 bg-gradient-to-br from-rose-400 to-rose-600 rounded-xl flex items-center justify-center shadow-sm">
+            <Trash2 className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <p className="font-semibold text-stone-800 dark:text-stone-100 text-sm">Historial de notificaciones</p>
+            <p className="text-xs text-stone-400 dark:text-stone-500">
+              {notifications.length === 0
+                ? 'El historial está vacío'
+                : `${notifications.length} notificación${notifications.length !== 1 ? 'es' : ''} almacenada${notifications.length !== 1 ? 's' : ''} · ${unreadCount} sin leer`}
+            </p>
+          </div>
+        </div>
+
+        {notifications.length > 0 ? (
+          <div className="flex items-center justify-between bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700 rounded-xl px-4 py-3">
+            <p className="text-sm text-stone-600 dark:text-stone-400">
+              Se eliminará todo el historial guardado en este dispositivo.
+            </p>
+            <button
+              type="button"
+              onClick={handleClearHistory}
+              className="ml-4 flex-shrink-0 flex items-center gap-1.5 text-sm text-red-600 dark:text-red-400 font-medium hover:text-red-700 dark:hover:text-red-300 transition-colors"
+            >
+              <Trash2 className="h-4 w-4" />
+              Limpiar
+            </button>
+          </div>
+        ) : (
+          <p className="text-sm text-stone-400 dark:text-stone-500 px-1">No hay notificaciones en el historial.</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════════
    SECCIÓN: Apariencia
 ═══════════════════════════════════════════════ */
 const TEXT_SIZES = [
@@ -489,10 +678,11 @@ export default function Configuracion() {
 
       {/* ── Tab content ── */}
       <div className="card p-6">
-        {activeTab === 'empresa'    && <TabEmpresa />}
-        {activeTab === 'produccion' && <TabProduccion />}
-        {activeTab === 'apariencia' && <TabApariencia />}
-        {activeTab === 'razas'      && (
+        {activeTab === 'empresa'        && <TabEmpresa />}
+        {activeTab === 'produccion'     && <TabProduccion />}
+        {activeTab === 'apariencia'     && <TabApariencia />}
+        {activeTab === 'notificaciones' && <TabNotificaciones />}
+        {activeTab === 'razas'          && (
           <div>
             <div className="flex items-center gap-3 pb-4 border-b border-stone-100 dark:border-stone-800 mb-5">
               <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-amber-600 rounded-xl flex items-center justify-center shadow-sm">
@@ -509,7 +699,7 @@ export default function Configuracion() {
       </div>
 
       {/* Nota localStorage */}
-      {(activeTab === 'empresa' || activeTab === 'produccion') && (
+      {['empresa', 'produccion', 'notificaciones'].includes(activeTab) && (
         <div className="flex items-start gap-2 text-xs text-stone-400 dark:text-stone-500 px-1">
           <Info className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
           <span>La configuración se guarda localmente en este dispositivo.</span>

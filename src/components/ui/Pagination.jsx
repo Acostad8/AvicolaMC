@@ -1,16 +1,17 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
-export default function Pagination({ page, totalPages, onPageChange, pageSize, onPageSizeChange }) {
+export default function Pagination({ page, totalPages, onPageChange, pageSize, onPageSizeChange, pageSizeOptions }) {
+  const options = pageSizeOptions || [10, 25, 50]
   return (
     <div className="flex items-center justify-between px-4 py-3 border-t border-stone-200 dark:border-stone-800">
       <div className="flex items-center gap-2 text-sm text-stone-500 dark:text-stone-400">
-        <span>Filas:</span>
+        <span>Por página:</span>
         <select
           value={pageSize}
           onChange={e => onPageSizeChange(Number(e.target.value))}
           className="input-base w-20 py-1.5 text-xs"
         >
-          {[10, 25, 50].map(n => <option key={n} value={n}>{n}</option>)}
+          {options.map(n => <option key={n} value={n}>{n}</option>)}
         </select>
       </div>
       <div className="flex items-center gap-1">

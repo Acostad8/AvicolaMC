@@ -26,7 +26,12 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\USUARIO\\\\Desktop\\\\sistema-avicola-mc\" -Recurse -ErrorAction SilentlyContinue)",
       "Bash(Head -50)",
       "Bash(Select-Object -First 20)",
-      "Bash(Format-Table FullName)"
+      "Bash(Format-Table FullName)",
+      "Bash(Get-ChildItem *)",
+      "Bash(node -e \"const icons = require\\('lucide-react'\\); ['Beaker','Syringe','Pill','Warehouse','Hash','CalendarCheck','Clock3','Boxes','BarChart3','Beaker'].forEach\\(n => console.log\\(n, !!icons[n]\\)\\)\")",
+      "Bash(dir *)",
+      "Bash(node -e \"const i=require\\('lucide-react'\\);['Skull','Lock','XCircle','Layers','Filter','CheckCircle2','MoreHorizontal','Users'].forEach\\(n=>console.log\\(n,!!i[n]\\)\\)\")",
+      "Bash(node -e \"const i=require\\('lucide-react'\\);['Crown','Egg','UserCheck','Users','Activity','BarChart3'].forEach\\(n=>console.log\\(n,!!i[n]\\)\\)\")"
     ]
   }
 }

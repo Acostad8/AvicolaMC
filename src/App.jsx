@@ -5,6 +5,7 @@ import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from './context/AuthContext'
 import { AccessibilityProvider } from './context/AccessibilityContext'
 import { ConfigProvider } from './context/ConfigContext'
+import { NotificationsProvider } from './context/NotificationsContext'
 import AccessibilityPanel from './components/ui/AccessibilityPanel'
 import ProtectedRoute, { AdminRoute } from './components/auth/ProtectedRoute'
 import PrivateLayout from './components/layout/PrivateLayout'
@@ -78,6 +79,7 @@ export default function App() {
   return (
     <AccessibilityProvider>
       <ConfigProvider>
+      <NotificationsProvider>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <BrowserRouter>
@@ -155,6 +157,7 @@ export default function App() {
         </BrowserRouter>
       </AuthProvider>
     </QueryClientProvider>
+    </NotificationsProvider>
     </ConfigProvider>
     </AccessibilityProvider>
   )

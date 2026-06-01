@@ -226,7 +226,7 @@ export default function EmpleadosList() {
             {paginated.map(e => <EmpleadoCard key={e.id} e={e} />)}
           </div>
           {filtered.length > pageSize && (
-            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} pageSize={pageSize} onPageSizeChange={n => { setPageSize(n); setPage(1) }} />
+            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} pageSize={pageSize} onPageSizeChange={n => { setPageSize(n); setPage(1) }} pageSizeOptions={[12, 24, 48]} />
           )}
         </>
       ) : (
@@ -274,7 +274,7 @@ export default function EmpleadosList() {
             </table>
           </div>
           {filtered.length > pageSize && (
-            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} pageSize={pageSize} onPageSizeChange={n => { setPageSize(n); setPage(1) }} />
+            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} pageSize={pageSize} onPageSizeChange={n => { setPageSize(n); setPage(1) }} pageSizeOptions={[12, 24, 48]} />
           )}
         </div>
       )}
