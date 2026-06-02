@@ -64,13 +64,24 @@ html[data-text-size="xl"] { font-size: 20px; }
 html.high-contrast { filter: contrast(1.5); }
 
 /* ── Reduce motion ── */
-@media (prefers-reduced-motion: reduce), html.reduce-motion {
+@media (prefers-reduced-motion: reduce) {
   .animate-fade-in-up, .animate-blob, .animate-bounce-slow, .animate-gradient,
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+html.reduce-motion .animate-fade-in-up,
+html.reduce-motion .animate-blob,
+html.reduce-motion .animate-bounce-slow,
+html.reduce-motion .animate-gradient,
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
 }
 
 /* ── Grid dot pattern ── */

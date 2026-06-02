@@ -82,97 +82,94 @@ export default function Dashboard() {
     boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
   }
 
-  const { data: kpis, isLoading: loadingKpis } = useQuery({
-    queryKey: ['dashboard-kpis', isAdmin, perfil?.id],
+  /* ── Una sola query que obtiene galpones una vez y deriva KPIs, gráfica y alertas ── */
+  const { data, isLoading } = useQuery({
+    queryKey: ['dashboard', isAdmin, perfil?.id, today],
+    enabled: !!perfil,
     queryFn: async () => {
+      /* 1. Galpones — una sola consulta para todo el dashboard */
       let galponesQ = supabase.from('galpones').select('id, nombre, estado, encargado_id')
       if (!isAdmin) galponesQ = galponesQ.eq('encargado_id', perfil.id)
       const { data: galpones } = await galponesQ.eq('estado', 'activo')
       const galponIds = (galpones || []).map(g => g.id)
 
-      if (galponIds.length === 0) return { galpones: 0, aves: 0, huevosHoy: 0, mortalidadHoy: 0, postura: 0 }
-
-      const { data: lotes } = await supabase.from('lotes').select('galpon_id, cantidad_aves_actuales')
-        .in('galpon_id', galponIds).eq('estado', 'activo')
-      const aves = (lotes || []).reduce((s, l) => s + (l.cantidad_aves_actuales || 0), 0)
-
-      const { data: prodHoy } = await supabase.from('produccion').select('huevos_producidos')
-        .in('galpon_id', galponIds).eq('fecha', today)
-      const huevosHoy = (prodHoy || []).reduce((s, p) => s + (p.huevos_producidos || 0), 0)
-
-      const { data: mortHoy } = await supabase.from('mortalidad').select('cantidad_bajas')
-        .in('galpon_id', galponIds).eq('fecha', today)
-      const mortalidadHoy = (mortHoy || []).reduce((s, m) => s + (m.cantidad_bajas || 0), 0)
-
-      const postura = aves > 0 ? ((huevosHoy / aves) * 100).toFixed(1) : 0
-
-      return { galpones: galponIds.length, aves, huevosHoy, mortalidadHoy, postura }
-    },
-    enabled: !!perfil,
-  })
-
-  const { data: chartData } = useQuery({
-    queryKey: ['dashboard-chart', isAdmin, perfil?.id],
-    queryFn: async () => {
-      let galponesQ = supabase.from('galpones').select('id')
-      if (!isAdmin) galponesQ = galponesQ.eq('encargado_id', perfil.id)
-      const { data: galpones } = await galponesQ.eq('estado', 'activo')
-      const galponIds = (galpones || []).map(g => g.id)
-      if (galponIds.length === 0) return []
+      if (galponIds.length === 0) {
+        return {
+          kpis:     { galpones: 0, aves: 0, huevosHoy: 0, mortalidadHoy: 0, postura: 0 },
+          chartData: [],
+          alertas:   [],
+        }
+      }
 
       const desde = format(subDays(new Date(), 6), 'yyyy-MM-dd')
-      const [{ data: prod }, { data: mort }] = await Promise.all([
+      const ayer  = format(subDays(new Date(), 1), 'yyyy-MM-dd')
+
+      /* 2. Todas las consultas derivadas en paralelo */
+      const [
+        { data: lotes },
+        { data: prodHoy },
+        { data: mortHoy },
+        { data: prodSemana },
+        { data: mortSemana },
+        { data: prodRecente },
+        insumosResult,
+      ] = await Promise.all([
+        supabase.from('lotes').select('galpon_id, cantidad_aves_actuales')
+          .in('galpon_id', galponIds).eq('estado', 'activo'),
+        supabase.from('produccion').select('huevos_producidos')
+          .in('galpon_id', galponIds).eq('fecha', today),
+        supabase.from('mortalidad').select('cantidad_bajas')
+          .in('galpon_id', galponIds).eq('fecha', today),
         supabase.from('produccion').select('fecha, huevos_producidos')
           .in('galpon_id', galponIds).gte('fecha', desde),
         supabase.from('mortalidad').select('fecha, cantidad_bajas')
           .in('galpon_id', galponIds).gte('fecha', desde),
+        supabase.from('produccion').select('galpon_id')
+          .in('galpon_id', galponIds).gte('fecha', ayer),
+        isAdmin
+          ? supabase.from('insumos').select('nombre, stock_actual, stock_minimo').eq('estado', 'activo')
+          : Promise.resolve({ data: null }),
       ])
 
+      /* 3. KPIs */
+      const aves         = (lotes || []).reduce((s, l) => s + (l.cantidad_aves_actuales || 0), 0)
+      const huevosHoy    = (prodHoy || []).reduce((s, p) => s + (p.huevos_producidos || 0), 0)
+      const mortalidadHoy= (mortHoy || []).reduce((s, m) => s + (m.cantidad_bajas || 0), 0)
+      const postura      = aves > 0 ? ((huevosHoy / aves) * 100).toFixed(1) : 0
+
+      /* 4. Datos gráfica últimos 7 días */
       const days = Array.from({ length: 7 }, (_, i) => format(subDays(new Date(), 6 - i), 'yyyy-MM-dd'))
-      return days.map(date => ({
-        fecha: date.slice(5),
-        huevos: (prod || []).filter(p => p.fecha === date).reduce((s, p) => s + p.huevos_producidos, 0),
-        bajas: (mort || []).filter(m => m.fecha === date).reduce((s, m) => s + m.cantidad_bajas, 0),
+      const chartData = days.map(date => ({
+        fecha:  date.slice(5),
+        huevos: (prodSemana || []).filter(p => p.fecha === date).reduce((s, p) => s + p.huevos_producidos, 0),
+        bajas:  (mortSemana || []).filter(m => m.fecha === date).reduce((s, m) => s + m.cantidad_bajas, 0),
       }))
-    },
-    enabled: !!perfil,
-  })
 
-  const { data: alertas } = useQuery({
-    queryKey: ['dashboard-alertas', isAdmin, perfil?.id],
-    queryFn: async () => {
-      const alerts = []
-      let galponesQ = supabase.from('galpones').select('id, nombre')
-      if (!isAdmin) galponesQ = galponesQ.eq('encargado_id', perfil.id)
-      const { data: galpones } = await galponesQ.eq('estado', 'activo')
-      const galponIds = (galpones || []).map(g => g.id)
-
-      const ayer = format(subDays(new Date(), 1), 'yyyy-MM-dd')
-      const { data: recentes } = await supabase.from('produccion').select('galpon_id')
-        .in('galpon_id', galponIds).gte('fecha', ayer)
-      const conRegistro = new Set((recentes || []).map(p => p.galpon_id))
+      /* 5. Alertas */
+      const alertas = []
+      const conRegistro = new Set((prodRecente || []).map(p => p.galpon_id))
       for (const g of (galpones || [])) {
         if (!conRegistro.has(g.id)) {
-          alerts.push({ type: 'warning', msg: `El galpón "${g.nombre}" lleva más de 1 día sin registro de producción` })
+          alertas.push({ type: 'warning', msg: `El galpón "${g.nombre}" lleva más de 1 día sin registro de producción` })
+        }
+      }
+      for (const ins of (insumosResult.data || [])) {
+        if (ins.stock_actual <= ins.stock_minimo) {
+          alertas.push({ type: 'stock', msg: `Stock bajo: "${ins.nombre}" (${ins.stock_actual} disponibles)` })
         }
       }
 
-      if (isAdmin) {
-        const { data: insumos } = await supabase.from('insumos')
-          .select('nombre, stock_actual, stock_minimo').eq('estado', 'activo')
-        for (const ins of (insumos || [])) {
-          if (ins.stock_actual <= ins.stock_minimo) {
-            alerts.push({ type: 'stock', msg: `Stock bajo: "${ins.nombre}" (${ins.stock_actual} disponibles)` })
-          }
-        }
+      return {
+        kpis: { galpones: galponIds.length, aves, huevosHoy, mortalidadHoy, postura },
+        chartData,
+        alertas,
       }
-
-      return alerts
     },
-    enabled: !!perfil,
   })
 
-  if (loadingKpis) {
+  const { kpis, chartData, alertas } = data || {}
+
+  if (isLoading) {
     return (
       <div className="space-y-6">
         <div className="h-20 bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 animate-pulse" />

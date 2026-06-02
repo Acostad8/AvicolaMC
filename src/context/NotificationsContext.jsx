@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback } from 'react'
+import { createContext, useContext, useState, useCallback, useMemo } from 'react'
 
 const NOTIF_KEY = 'avicola-mc-notifications'
 const MAX = 60
@@ -57,7 +57,10 @@ export function NotificationsProvider({ children }) {
     localStorage.removeItem(NOTIF_KEY)
   }, [])
 
-  const unreadCount = notifications.filter(n => !n.leida).length
+  const unreadCount = useMemo(
+    () => notifications.filter(n => !n.leida).length,
+    [notifications]
+  )
 
   return (
     <NotificationsCtx.Provider value={{ notifications, addNotification, markRead, markAllRead, clearAll, unreadCount }}>
