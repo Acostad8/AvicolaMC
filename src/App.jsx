@@ -69,9 +69,10 @@ const ProveedoresList   = lazy(() => import('./pages/private/proveedores/Proveed
 const ProveedorForm     = lazy(() => import('./pages/private/proveedores/ProveedorForm'))
 const ProveedorDetalle  = lazy(() => import('./pages/private/proveedores/ProveedorDetalle'))
 
-// Reportes y Configuración
+// Reportes, Configuración y Auditoría
 const Reportes      = lazy(() => import('./pages/private/Reportes'))
 const Configuracion = lazy(() => import('./pages/private/configuracion/Configuracion'))
+const Auditoria     = lazy(() => import('./pages/private/auditoria/Auditoria'))
 
 function PageLoader() {
   return (
@@ -158,6 +159,7 @@ export default function App() {
 
                     <Route path="/dashboard/reportes" element={<Reportes />} />
                     <Route path="/dashboard/configuracion" element={<AdminRoute><Configuracion /></AdminRoute>} />
+                    <Route path="/dashboard/auditoria" element={<AdminRoute><Auditoria /></AdminRoute>} />
                     <Route path="/dashboard/*" element={<Navigate to="/dashboard" replace />} />
                   </Route>
                 </Route>

@@ -35,7 +35,8 @@
       "Bash(node -e \"const r = require\\('recharts'\\); console.log\\('ComposedChart' in r\\)\")",
       "Bash(git *)",
       "Bash(node -e ' *)",
-      "Bash(npx --yes tsc --noEmit)"
+      "Bash(npx --yes tsc --noEmit)",
+      "mcp__claude_ai_Supabase__list_migrations"
     ]
   }
 }

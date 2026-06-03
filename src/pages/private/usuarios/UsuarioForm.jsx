@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../context/AuthContext'
+import { registrarEvento } from '../../../lib/auditoria'
 import Input from '../../../components/ui/Input'
 import Select from '../../../components/ui/Select'
 import Button from '../../../components/ui/Button'
@@ -467,8 +468,19 @@ export default function UsuarioForm() {
                 size="sm"
                 onClick={async () => {
                   const { error } = await supabase.auth.resetPasswordForEmail(usuario?.email)
-                  if (!error) toast.success('Enlace de restablecimiento enviado al correo')
-                  else toast.error('Error al enviar enlace')
+                  if (!error) {
+                    toast.success('Enlace de restablecimiento enviado al correo')
+                    registrarEvento({
+                      operacion: 'RESET_PASSWORD',
+                      registro_id: id,
+                      usuario_id: currentUser?.id,
+                      usuario_nombre: currentUser?.nombre_completo,
+                      descripcion: `Enlace de restablecimiento enviado a ${usuario?.email}`,
+                      datos_nuevos: { email_destino: usuario?.email },
+                    })
+                  } else {
+                    toast.error('Error al enviar enlace')
+                  }
                 }}
               >
                 Enviar enlace de restablecimiento

@@ -7,6 +7,7 @@ import { useMutation } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import { formatDate } from '../../lib/utils'
+import { registrarEvento } from '../../lib/auditoria'
 import Input from '../../components/ui/Input'
 import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
@@ -85,6 +86,12 @@ export default function Perfil() {
       if (error) throw error
     },
     onSuccess: () => {
+      registrarEvento({
+        operacion: 'PASSWORD_CHANGE',
+        usuario_id: session?.user?.id,
+        usuario_nombre: perfil?.nombre_completo,
+        descripcion: 'Cambio de contraseña desde perfil propio',
+      })
       passForm.reset()
       toast.success('Contraseña actualizada correctamente')
       setTimeout(async () => {

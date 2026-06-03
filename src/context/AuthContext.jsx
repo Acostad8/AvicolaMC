@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { queryClient } from '../lib/queryClient'
+import { registrarEvento } from '../lib/auditoria'
 
 const AuthContext = createContext(null)
 
@@ -51,7 +52,7 @@ export function AuthProvider({ children }) {
 
     const { data: perfilData } = await supabase
       .from('perfiles')
-      .select('estado')
+      .select('estado, nombre_completo')
       .eq('id', data.user.id)
       .single()
 
@@ -60,10 +61,27 @@ export function AuthProvider({ children }) {
       throw new Error('Tu cuenta está inactiva. Contacta al administrador.')
     }
 
+    registrarEvento({
+      operacion: 'LOGIN',
+      usuario_id: data.user.id,
+      usuario_nombre: perfilData?.nombre_completo,
+      descripcion: 'Inicio de sesión exitoso',
+      datos_nuevos: { email: data.user.email },
+    })
+
     return data
   }
 
   async function signOut() {
+    // Registrar ANTES de cerrar sesión (necesita JWT válido)
+    if (session?.user) {
+      await registrarEvento({
+        operacion: 'LOGOUT',
+        usuario_id: session.user.id,
+        usuario_nombre: perfil?.nombre_completo,
+        descripcion: 'Cierre de sesión',
+      })
+    }
     await supabase.auth.signOut()
     queryClient.clear()
     setPerfil(null)

@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import {
   LayoutDashboard, Building2, Layers, Egg, Skull, Syringe,
-  Package, Users, UserCog, BarChart3, Settings, LogOut, Bird, X, Truck
+  Package, Users, UserCog, BarChart3, Settings, LogOut, Bird, X, Truck, ShieldCheck
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -18,6 +18,7 @@ const adminLinks = [
   { to: '/dashboard/empleados',      icon: Users,           label: 'Empleados' },
   { to: '/dashboard/usuarios',       icon: UserCog,         label: 'Usuarios' },
   { to: '/dashboard/reportes',       icon: BarChart3,       label: 'Reportes' },
+  { to: '/dashboard/auditoria',      icon: ShieldCheck,     label: 'Auditoría' },
   { to: '/dashboard/configuracion',  icon: Settings,        label: 'Configuración' },
 ]
 
