@@ -5,6 +5,7 @@ import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../context/AuthContext'
 import { useA11y } from '../../../context/AccessibilityContext'
 import { formatDate, calcWeeksAge, formatNumber } from '../../../lib/utils'
+import { useAutoRefreshAtMidnight } from '../../../hooks/useAutoRefreshAtMidnight'
 import {
   Plus, Eye, Pencil, Layers, Search, X, LayoutGrid, List,
   Bird, Calendar, TrendingDown, Activity, CheckCircle2,
@@ -141,13 +142,15 @@ function LoteCard({ lote, index, noMotion, isAdmin }) {
         {/* Actions */}
         <div className="pt-3 border-t border-stone-100 dark:border-stone-800 mt-auto flex gap-2">
           <Link to={`/dashboard/lotes/${lote.id}`} className={isAdmin && (isActivo || lote.estado === 'suspendido') ? 'flex-1' : 'block w-full'}>
-            <Button variant="secondary" size="sm" icon={Eye} className="w-full justify-center text-xs group-hover:bg-primary-50 dark:group-hover:bg-primary-900/20 group-hover:border-primary-300 dark:group-hover:border-primary-700 group-hover:text-primary-700 dark:group-hover:text-primary-400 transition-all">
+            <Button variant="" size="sm" icon={Eye} className="w-full justify-center text-xs border border-primary-500 dark:border-primary-400 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/25 transition-all">
               Ver
             </Button>
           </Link>
           {isAdmin && (isActivo || lote.estado === 'suspendido') && (
             <Link to={`/dashboard/lotes/${lote.id}/editar`}>
-              <Button variant="ghost" size="sm" icon={Pencil} aria-label={`Editar ${lote.nombre_numero}`} />
+              <Button variant="" size="sm" icon={Pencil} aria-label={`Editar ${lote.nombre_numero}`}
+                className="border border-blue-400 dark:border-blue-500 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/25"
+              />
             </Link>
           )}
         </div>
@@ -158,6 +161,7 @@ function LoteCard({ lote, index, noMotion, isAdmin }) {
 
 /* ── Main ── */
 export default function LotesList() {
+  useAutoRefreshAtMidnight()
   const { isAdmin, perfil } = useAuth()
   const { noMotion } = useA11y()
   const [filterEstado, setFilterEstado] = useState('')
@@ -334,10 +338,14 @@ export default function LotesList() {
                       <td className="px-4 py-3 whitespace-nowrap">{l.estado === 'activo' ? <span className="text-green-600 dark:text-green-400 font-semibold">{calcWeeksAge(l.fecha_ingreso)} sem.</span> : <span className="text-stone-400 dark:text-stone-600">—</span>}</td>
                       <td className="px-4 py-3"><StatusBadge status={l.estado} /></td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1">
-                          <Link to={`/dashboard/lotes/${l.id}`}><Button variant="ghost" size="sm" icon={Eye}>Ver</Button></Link>
+                        <div className="flex items-center gap-1.5">
+                          <Link to={`/dashboard/lotes/${l.id}`}>
+                            <Button variant="" size="sm" icon={Eye} className="border border-primary-500 dark:border-primary-400 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/25">Ver</Button>
+                          </Link>
                           {isAdmin && (l.estado === 'activo' || l.estado === 'suspendido') && (
-                            <Link to={`/dashboard/lotes/${l.id}/editar`}><Button variant="ghost" size="sm" icon={Pencil} aria-label="Editar" /></Link>
+                            <Link to={`/dashboard/lotes/${l.id}/editar`}>
+                              <Button variant="" size="sm" icon={Pencil} className="border border-blue-400 dark:border-blue-500 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/25">Editar</Button>
+                            </Link>
                           )}
                         </div>
                       </td>

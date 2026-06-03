@@ -1,11 +1,11 @@
 import { cn } from '../../lib/utils'
 
 const variants = {
-  primary: 'bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500',
-  secondary: 'bg-white text-stone-700 border border-stone-300 hover:bg-stone-50 focus:ring-stone-400',
-  danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
-  ghost: 'text-stone-600 hover:bg-stone-100 focus:ring-stone-400',
-  success: 'bg-farm-green text-white hover:bg-farm-green-dark focus:ring-green-500',
+  primary:   'bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500 dark:bg-primary-500 dark:hover:bg-primary-600',
+  secondary: 'bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-200 border border-stone-300 dark:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-700 focus:ring-stone-400 dark:focus:ring-offset-stone-900',
+  danger:    'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
+  ghost:     'text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800 focus:ring-stone-400',
+  success:   'bg-farm-green text-white hover:bg-farm-green-dark focus:ring-green-500',
 }
 
 const sizes = {

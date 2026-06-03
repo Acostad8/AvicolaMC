@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../context/AuthContext'
 import { useA11y } from '../../../context/AccessibilityContext'
+import { useAutoRefreshAtMidnight } from '../../../hooks/useAutoRefreshAtMidnight'
 import { formatDate, formatNumber, calcWeeksAge } from '../../../lib/utils'
 import PageHeader from '../../../components/ui/PageHeader'
 import Button from '../../../components/ui/Button'
@@ -64,6 +65,7 @@ function OccupancyGauge({ current, max }) {
 }
 
 export default function GalponDetalle() {
+  useAutoRefreshAtMidnight()
   const { id } = useParams()
   const { isAdmin } = useAuth()
   const { dark } = useA11y()

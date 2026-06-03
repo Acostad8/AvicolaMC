@@ -460,8 +460,12 @@ function TabNotificaciones() {
                   type="button"
                   role="switch"
                   aria-checked={enabled}
-                  onClick={() => setCategory(cat.key, !enabled)}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${
+                  aria-disabled={!globalOn}
+                  tabIndex={globalOn ? 0 : -1}
+                  onClick={() => globalOn && setCategory(cat.key, !enabled)}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${
+                    globalOn ? 'cursor-pointer' : 'cursor-not-allowed'
+                  } ${
                     enabled ? 'bg-primary-500' : 'bg-stone-200 dark:bg-stone-700'
                   }`}
                 >
@@ -702,7 +706,7 @@ export default function Configuracion() {
       {['empresa', 'produccion', 'notificaciones'].includes(activeTab) && (
         <div className="flex items-start gap-2 text-xs text-stone-400 dark:text-stone-500 px-1">
           <Info className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
-          <span>La configuración se guarda localmente en este dispositivo.</span>
+          <span>La configuración se sincroniza en todos los dispositivos. Se guarda localmente como respaldo sin conexión.</span>
         </div>
       )}
     </div>

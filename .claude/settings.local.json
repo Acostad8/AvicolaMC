@@ -31,7 +31,11 @@
       "Bash(node -e \"const icons = require\\('lucide-react'\\); ['Beaker','Syringe','Pill','Warehouse','Hash','CalendarCheck','Clock3','Boxes','BarChart3','Beaker'].forEach\\(n => console.log\\(n, !!icons[n]\\)\\)\")",
       "Bash(dir *)",
       "Bash(node -e \"const i=require\\('lucide-react'\\);['Skull','Lock','XCircle','Layers','Filter','CheckCircle2','MoreHorizontal','Users'].forEach\\(n=>console.log\\(n,!!i[n]\\)\\)\")",
-      "Bash(node -e \"const i=require\\('lucide-react'\\);['Crown','Egg','UserCheck','Users','Activity','BarChart3'].forEach\\(n=>console.log\\(n,!!i[n]\\)\\)\")"
+      "Bash(node -e \"const i=require\\('lucide-react'\\);['Crown','Egg','UserCheck','Users','Activity','BarChart3'].forEach\\(n=>console.log\\(n,!!i[n]\\)\\)\")",
+      "Bash(node -e \"const r = require\\('recharts'\\); console.log\\('ComposedChart' in r\\)\")",
+      "Bash(git *)",
+      "Bash(node -e ' *)",
+      "Bash(npx --yes tsc --noEmit)"
     ]
   }
 }

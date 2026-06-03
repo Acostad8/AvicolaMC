@@ -146,7 +146,7 @@ export default function ProveedorDetalle() {
   const tieneRazas   = proveedor.tipo_proveedor === 'razas'   || proveedor.tipo_proveedor === 'ambos'
 
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className=" space-y-5">
       <PageHeader
         title="Detalle del proveedor"
         breadcrumbs={[

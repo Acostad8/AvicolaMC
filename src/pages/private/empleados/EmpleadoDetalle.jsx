@@ -92,7 +92,7 @@ export default function EmpleadoDetalle() {
   const avatarGrad = AVATAR_GRAD[idx]
 
   return (
-    <div className="space-y-5 max-w-2xl">
+    <div className=" space-y-5 max-w-2xl">
       <PageHeader
         title="Perfil del empleado"
         breadcrumbs={[

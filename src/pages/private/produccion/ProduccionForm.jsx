@@ -13,7 +13,11 @@ import Textarea from '../../../components/ui/Textarea'
 import Button from '../../../components/ui/Button'
 import PageHeader from '../../../components/ui/PageHeader'
 import toast from 'react-hot-toast'
-import { Egg, AlertCircle, CheckCircle2, Info, Layers, Clock, AlertTriangle } from 'lucide-react'
+import {
+  Egg, AlertCircle, CheckCircle2, Info, Layers,
+  Clock, AlertTriangle, Building2, CalendarDays,
+  Wheat, FileText, TrendingUp,
+} from 'lucide-react'
 
 const schema = z.object({
   fecha:               z.string().min(1, 'Requerido'),
@@ -24,11 +28,10 @@ const schema = z.object({
 })
 
 function msDesdeCreacion(created_at) {
-  if (!created_at) return 0          // mientras carga: no bloquear todavía
+  if (!created_at) return 0
   return Date.now() - new Date(created_at).getTime()
 }
 
-/* Info box variants */
 function InfoBox({ type = 'info', icon: Icon, children }) {
   const styles = {
     info:    'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/50 text-amber-800 dark:text-amber-300',
@@ -37,8 +40,7 @@ function InfoBox({ type = 'info', icon: Icon, children }) {
     warning: 'bg-yellow-50 dark:bg-yellow-950/30 border-yellow-200 dark:border-yellow-900/50 text-yellow-800 dark:text-yellow-300',
   }
   const IconMap = { info: Info, success: CheckCircle2, error: AlertCircle, warning: AlertCircle }
-  const DefaultIcon = IconMap[type]
-  const I = Icon || DefaultIcon
+  const I = Icon || IconMap[type]
   return (
     <div className={`flex items-start gap-2.5 border rounded-xl px-4 py-3 text-sm ${styles[type]}`}>
       <I className="h-4 w-4 flex-shrink-0 mt-0.5" aria-hidden="true" />
@@ -47,6 +49,174 @@ function InfoBox({ type = 'info', icon: Icon, children }) {
   )
 }
 
+function FormSection({ icon: Icon, title, gradient, children }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 pb-3 border-b border-stone-100 dark:border-stone-800">
+        <div className={`w-7 h-7 bg-gradient-to-br ${gradient} rounded-lg flex items-center justify-center flex-shrink-0`}>
+          <Icon className="h-3.5 w-3.5 text-white" aria-hidden="true" />
+        </div>
+        <h2 className="text-sm font-semibold text-stone-700 dark:text-stone-300">{title}</h2>
+      </div>
+      {children}
+    </div>
+  )
+}
+
+/* ── Gauge de postura ── */
+function PosturaGauge({ value }) {
+  if (value === null) return null
+  const color = value >= 90 ? 'text-emerald-500' : value >= 75 ? 'text-amber-500' : 'text-red-500'
+  const bar   = value >= 90 ? 'bg-emerald-500' : value >= 75 ? 'bg-amber-500' : 'bg-red-500'
+  const label = value >= 90 ? 'Excelente' : value >= 75 ? 'Buena' : 'Baja'
+  const pct   = Math.min(value, 100)
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-end justify-between">
+        <p className="text-xs text-stone-500 dark:text-stone-400">% de postura</p>
+        <p className={`text-2xl font-bold tabular-nums leading-none ${color}`}>{value}%</p>
+      </div>
+      <div className="h-2.5 bg-stone-100 dark:bg-stone-700 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-700 ${bar}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <div className="flex justify-between text-xs">
+        <span className={`font-semibold ${color}`}>{label}</span>
+        <span className="text-stone-400 dark:text-stone-500">meta: 90%</span>
+      </div>
+    </div>
+  )
+}
+
+/* ── Preview card ── */
+function PreviewCard({
+  fecha, galponNombre, loteNombre, avesRef, razaNombre,
+  huevos, consumo, posturaCalc, fueraDePlazo,
+  horasRestantes, minutosRestantes, isEdit, hasLote, duplicado, superaAves,
+}) {
+  const checks = isEdit ? [
+    { ok: !!fecha,            text: 'Fecha definida' },
+    { ok: Number(huevos) >= 0 && huevos !== '', text: 'Huevos ingresados' },
+    { ok: Number(consumo) >= 0 && consumo !== '', text: 'Consumo de alimento' },
+  ] : [
+    { ok: !!fecha,      text: 'Fecha seleccionada' },
+    { ok: !!galponNombre, text: 'Galpón seleccionado' },
+    { ok: hasLote,      text: 'Lote activo disponible' },
+    { ok: Number(huevos) >= 0 && huevos !== '', text: 'Huevos ingresados' },
+    { ok: !duplicado,   text: 'Sin registro duplicado' },
+    { ok: !superaAves,  text: 'Cantidad válida' },
+  ]
+
+  return (
+    <div className="space-y-4 h-fit">
+      <div className="card p-5 space-y-5">
+        {/* Header */}
+        <div className="flex items-center gap-2 pb-3 border-b border-stone-100 dark:border-stone-800">
+          <div className="w-7 h-7 bg-gradient-to-br from-amber-400 to-amber-600 rounded-lg flex items-center justify-center flex-shrink-0">
+            <TrendingUp className="h-3.5 w-3.5 text-white" />
+          </div>
+          <h2 className="text-sm font-semibold text-stone-700 dark:text-stone-300">Vista previa</h2>
+        </div>
+
+        {/* Mini tarjeta del registro */}
+        <div className="rounded-xl border-2 border-amber-300 dark:border-amber-700 bg-amber-50/40 dark:bg-amber-950/20 p-4 space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-sm flex-shrink-0">
+              <Egg className="h-5 w-5 text-white" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-semibold text-stone-800 dark:text-stone-100 text-sm leading-tight">
+                {galponNombre || <span className="italic font-normal text-stone-400 dark:text-stone-600">Galpón sin seleccionar</span>}
+              </p>
+              <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+                {loteNombre
+                  ? <>{loteNombre}{razaNombre && ` · ${razaNombre}`}</>
+                  : <span className="italic">Sin lote activo</span>
+                }
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div className="bg-white/60 dark:bg-stone-800/60 rounded-lg px-3 py-2">
+              <p className="text-xs text-stone-400 dark:text-stone-500">Fecha</p>
+              <p className="text-sm font-semibold text-stone-700 dark:text-stone-200 mt-0.5">
+                {fecha
+                  ? new Date(fecha + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })
+                  : <span className="font-normal italic text-stone-400">—</span>
+                }
+              </p>
+            </div>
+            <div className="bg-white/60 dark:bg-stone-800/60 rounded-lg px-3 py-2">
+              <p className="text-xs text-stone-400 dark:text-stone-500">Aves activas</p>
+              <p className="text-sm font-bold text-stone-700 dark:text-stone-200 mt-0.5 tabular-nums">
+                {avesRef ? avesRef.toLocaleString('es-CO') : <span className="font-normal italic text-stone-400">—</span>}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div className="bg-white/60 dark:bg-stone-800/60 rounded-lg px-3 py-2">
+              <p className="text-xs text-stone-400 dark:text-stone-500">Huevos</p>
+              <p className={`text-lg font-bold tabular-nums leading-none mt-0.5 ${superaAves ? 'text-red-500' : 'text-stone-800 dark:text-stone-100'}`}>
+                {huevos !== '' && huevos !== undefined ? Number(huevos).toLocaleString('es-CO') : '—'}
+              </p>
+            </div>
+            <div className="bg-white/60 dark:bg-stone-800/60 rounded-lg px-3 py-2">
+              <p className="text-xs text-stone-400 dark:text-stone-500">Alimento</p>
+              <p className="text-lg font-bold tabular-nums leading-none mt-0.5 text-stone-800 dark:text-stone-100">
+                {consumo !== '' && consumo !== undefined ? `${Number(consumo).toLocaleString('es-CO')} kg` : '—'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Gauge de postura */}
+        {posturaCalc !== null && !superaAves && (
+          <div className="border border-stone-100 dark:border-stone-800 rounded-xl p-3">
+            <PosturaGauge value={posturaCalc} />
+          </div>
+        )}
+
+        {/* Tiempo restante */}
+        {isEdit && !fueraDePlazo && (
+          <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2.5">
+            <Clock className="h-4 w-4 text-amber-500 flex-shrink-0" />
+            <div>
+              <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">Ventana de edición</p>
+              <p className="text-xs text-amber-700 dark:text-amber-400 tabular-nums">
+                {horasRestantes}h {minutosRestantes}min restantes
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Checklist */}
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wide">Estado</p>
+          <div className="space-y-1.5">
+            {checks.map(({ ok, text }) => (
+              <div key={text} className="flex items-center gap-2">
+                {ok
+                  ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
+                  : <AlertCircle  className="h-3.5 w-3.5 text-stone-300 dark:text-stone-600 flex-shrink-0" />
+                }
+                <span className={`text-xs ${ok ? 'text-stone-600 dark:text-stone-300' : 'text-stone-400 dark:text-stone-600'}`}>
+                  {text}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Main component ── */
 export default function ProduccionForm() {
   const { id } = useParams()
   const isEdit = !!id
@@ -62,7 +232,9 @@ export default function ProduccionForm() {
 
   const galponId = watch('galpon_id')
   const huevos   = watch('huevos_producidos')
+  const consumo  = watch('consumo_alimento_kg')
   const fecha    = watch('fecha')
+  const observaciones = watch('observaciones')
 
   /* ── Registro existente (solo edición) ── */
   const { data: registro } = useQuery({
@@ -78,7 +250,6 @@ export default function ProduccionForm() {
     enabled: isEdit,
   })
 
-  /* Pre-cargar valores en edición */
   useEffect(() => {
     if (!registro) return
     reset({
@@ -90,7 +261,7 @@ export default function ProduccionForm() {
     })
   }, [registro, reset])
 
-  /* ── Cálculo ventana de edición ── */
+  /* ── Ventana de edición ── */
   const msTranscurridos  = msDesdeCreacion(registro?.created_at)
   const fueraDePlazo     = isEdit && !isAdmin && msTranscurridos > 24 * 3600 * 1000
   const msRestantes      = Math.max(0, 24 * 3600 * 1000 - msTranscurridos)
@@ -121,7 +292,7 @@ export default function ProduccionForm() {
     enabled: !!galponId && !isEdit,
   })
 
-  /* ── Duplicado: en edición excluye el registro actual ── */
+  /* ── Duplicado ── */
   const { data: duplicado } = useQuery({
     queryKey: ['produccion-duplicado', galponId, fecha, id],
     queryFn: async () => {
@@ -133,10 +304,8 @@ export default function ProduccionForm() {
     enabled: !!galponId && !!fecha,
   })
 
-  /* Aves de referencia para validación y postura */
-  const avesRef = isEdit
-    ? registro?.lote?.cantidad_aves_actuales
-    : loteActivo?.cantidad_aves_actuales
+  const avesRef    = isEdit ? registro?.lote?.cantidad_aves_actuales : loteActivo?.cantidad_aves_actuales
+  const superaAves = avesRef && Number(huevos) > avesRef
 
   useEffect(() => {
     if (avesRef && Number(huevos) >= 0) {
@@ -146,9 +315,24 @@ export default function ProduccionForm() {
     }
   }, [huevos, avesRef])
 
-  const superaAves = avesRef && Number(huevos) > avesRef
+  /* ── Redirect si fuera de plazo ── */
+  const redirectedRef = useRef(false)
+  useEffect(() => {
+    if (isEdit && !isAdmin && registro && fueraDePlazo && !redirectedRef.current) {
+      redirectedRef.current = true
+      toast.error('El período de edición de 24 horas ha vencido.')
+      navigate(`/dashboard/produccion/${id}`, { replace: true })
+    }
+  }, [isEdit, isAdmin, registro, fueraDePlazo, navigate, id])
 
-  /* ── Mutación ── */
+  const isDisabled = fueraDePlazo || !!duplicado || (!isEdit && (!loteActivo || !!superaAves))
+
+  /* ── Preview data ── */
+  const previewGalponNombre = isEdit ? registro?.galpon?.nombre : (galpones || []).find(g => g.id === galponId)?.nombre
+  const previewLoteNombre   = isEdit ? registro?.lote?.nombre_numero : loteActivo?.nombre_numero
+  const previewRazaNombre   = isEdit ? registro?.lote?.raza?.nombre  : loteActivo?.raza?.nombre
+
+  /* ── Mutation ── */
   const mutation = useMutation({
     mutationFn: async (values) => {
       if (isEdit) {
@@ -157,7 +341,6 @@ export default function ProduccionForm() {
 
         const postura = calcPostura(values.huevos_producidos, registro.lote?.cantidad_aves_actuales)
 
-        /* Snapshots para auditoría */
         const datosAnteriores = {
           huevos_producidos:   registro.huevos_producidos,
           consumo_alimento_kg: registro.consumo_alimento_kg ?? null,
@@ -171,7 +354,6 @@ export default function ProduccionForm() {
           observaciones:       values.observaciones || null,
         }
 
-        /* 1. Actualizar registro */
         const { error: errUpd } = await supabase
           .from('produccion')
           .update({
@@ -183,7 +365,6 @@ export default function ProduccionForm() {
           .eq('id', id)
         if (errUpd) throw errUpd
 
-        /* 2. Insertar registro de auditoría */
         const { error: errAud } = await supabase
           .from('auditoria_produccion')
           .insert({
@@ -195,7 +376,6 @@ export default function ProduccionForm() {
         if (errAud) throw errAud
 
       } else {
-        /* ── Creación ── */
         if (!loteActivo) throw new Error('No hay lote activo en este galpón')
         if (duplicado)   throw new Error('Ya existe un registro de producción para este galpón en esta fecha')
         if (superaAves)  throw new Error(`Los huevos (${values.huevos_producidos}) no pueden superar las aves activas (${loteActivo.cantidad_aves_actuales})`)
@@ -220,20 +400,8 @@ export default function ProduccionForm() {
     onError: e => toast.error(e.message || 'Error al guardar'),
   })
 
-  /* Redirigir automáticamente si un no-admin intenta editar un registro bloqueado */
-  const redirectedRef = useRef(false)
-  useEffect(() => {
-    if (isEdit && !isAdmin && registro && fueraDePlazo && !redirectedRef.current) {
-      redirectedRef.current = true
-      toast.error('El período de edición de 24 horas ha vencido.')
-      navigate(`/dashboard/produccion/${id}`, { replace: true })
-    }
-  }, [isEdit, isAdmin, registro, fueraDePlazo, navigate, id])
-
-  const isDisabled = fueraDePlazo || !!duplicado || (!isEdit && (!loteActivo || !!superaAves))
-
   return (
-    <div className="max-w-xl">
+    <div className="w-full space-y-5">
       <PageHeader
         title={isEdit ? 'Editar producción' : 'Registrar producción'}
         breadcrumbs={[
@@ -243,167 +411,206 @@ export default function ProduccionForm() {
         ]}
       />
 
-      {/* ── Banner: fuera de plazo ── */}
+      {/* Banner: fuera de plazo */}
       {isEdit && fueraDePlazo && (
-        <div className="mb-4 flex items-start gap-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3 text-sm text-red-700 dark:text-red-400">
+        <div className="flex items-start gap-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3 text-sm text-red-700 dark:text-red-400">
           <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
           <span>El período de edición de 24 horas ha vencido. Este registro ya no puede modificarse.</span>
         </div>
       )}
 
-      {/* ── Banner: tiempo restante ── */}
-      {isEdit && !fueraDePlazo && registro && (
-        <div className="mb-4 flex items-center gap-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
-          <Clock className="h-4 w-4 flex-shrink-0" />
-          <span>
-            Tiempo restante para editar:{' '}
-            <strong>{horasRestantes}h {minutosRestantes}min</strong>
-          </span>
-        </div>
-      )}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
-      <form onSubmit={handleSubmit(v => mutation.mutate(v))} className="card p-6 space-y-5">
-
-        {/* Header del formulario */}
-        <div className="flex items-center gap-3 pb-4 border-b border-stone-100 dark:border-stone-800">
-          <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-amber-600 rounded-xl flex items-center justify-center shadow-sm">
-            <Egg className="h-5 w-5 text-white" aria-hidden="true" />
-          </div>
-          <div>
-            <p className="font-semibold text-stone-800 dark:text-stone-100 text-sm">
-              {isEdit ? 'Editar registro de producción' : 'Nuevo registro de producción'}
-            </p>
-            <p className="text-xs text-stone-400 dark:text-stone-500">
-              {isEdit ? 'Modifica los campos que necesites corregir' : 'Completa todos los campos requeridos'}
-            </p>
-          </div>
-        </div>
-
-        {/* En edición: fecha editable, galpón/lote como info */}
-        {isEdit ? (
-          <>
-            <Input
-              label="Fecha"
-              type="date"
-              error={errors.fecha?.message}
-              disabled={fueraDePlazo}
-              {...register('fecha')}
-            />
-            <div className="bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-lg px-3 py-2 text-xs text-stone-600 dark:text-stone-400 space-y-0.5">
-              <p>Galpón: <strong className="text-stone-800 dark:text-stone-200">{registro?.galpon?.nombre || '—'}</strong></p>
-              <p>
-                Lote: <strong className="text-stone-800 dark:text-stone-200">{registro?.lote?.nombre_numero || '—'}</strong>
-                {registro?.lote?.raza?.nombre && <> · Raza: <strong className="text-stone-800 dark:text-stone-200">{registro.lote.raza.nombre}</strong></>}
-                {' · '}Aves activas: <strong className="text-stone-800 dark:text-stone-200">{avesRef?.toLocaleString('es-CO') ?? '—'}</strong>
+        {/* ── Formulario principal (2/3) ── */}
+        <form
+          onSubmit={handleSubmit(v => mutation.mutate(v))}
+          className="lg:col-span-2 card p-6 space-y-7"
+        >
+          {/* Form header */}
+          <div className="flex items-center gap-3 pb-4 border-b border-stone-100 dark:border-stone-800">
+            <div className="w-11 h-11 bg-gradient-to-br from-amber-400 to-amber-600 rounded-xl flex items-center justify-center shadow-sm">
+              <Egg className="h-5 w-5 text-white" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="font-semibold text-stone-800 dark:text-stone-100 text-sm leading-tight">
+                {isEdit ? 'Editar registro de producción' : 'Nuevo registro de producción'}
+              </p>
+              <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">
+                {isEdit ? 'Modifica los campos que necesites corregir' : 'Completa todos los campos requeridos'}
               </p>
             </div>
-          </>
-        ) : (
-          /* En creación: fecha + selector de galpón */
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input
-              label="Fecha"
-              type="date"
-              error={errors.fecha?.message}
-              {...register('fecha')}
-            />
-            <Select
-              label="Galpón"
-              options={(galpones || []).map(g => ({ value: g.id, label: g.nombre }))}
-              placeholder="Seleccionar galpón"
-              error={errors.galpon_id?.message}
-              {...register('galpon_id')}
-            />
           </div>
-        )}
 
-        {/* Info de lote activo (solo creación) */}
-        {!isEdit && galponId && loteActivo && (
-          <InfoBox type="info" icon={Layers}>
-            <p className="font-semibold">Lote activo: {loteActivo.nombre_numero}</p>
-            <p className="text-xs mt-0.5">
-              {loteActivo.cantidad_aves_actuales?.toLocaleString('es-CO')} aves activas
-              {loteActivo.raza?.nombre && <> · Raza: <strong>{loteActivo.raza.nombre}</strong></>}
-            </p>
-          </InfoBox>
-        )}
-        {!isEdit && galponId && !loteActivo && (
-          <InfoBox type="error">
-            Este galpón no tiene un lote activo. Crea un lote antes de registrar producción.
-          </InfoBox>
-        )}
-        {duplicado && (
-          <InfoBox type="error">
-            Ya existe un registro de producción para este galpón en la fecha seleccionada.
-          </InfoBox>
-        )}
+          {/* ── Sección: Fecha y galpón ── */}
+          <FormSection icon={CalendarDays} title="Fecha y galpón" gradient="from-blue-400 to-blue-600">
+            {isEdit ? (
+              <div className="space-y-4">
+                <Input
+                  label="Fecha"
+                  type="date"
+                  error={errors.fecha?.message}
+                  disabled={fueraDePlazo}
+                  {...register('fecha')}
+                />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-stone-50 dark:bg-stone-800/60 border border-stone-200 dark:border-stone-700 rounded-xl px-4 py-3">
+                  <div>
+                    <p className="text-xs text-stone-400 dark:text-stone-500">Galpón</p>
+                    <p className="text-sm font-semibold text-stone-800 dark:text-stone-200 mt-0.5">{registro?.galpon?.nombre || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-stone-400 dark:text-stone-500">Lote</p>
+                    <p className="text-sm font-semibold text-stone-800 dark:text-stone-200 mt-0.5">{registro?.lote?.nombre_numero || '—'}</p>
+                  </div>
+                  {registro?.lote?.raza?.nombre && (
+                    <div>
+                      <p className="text-xs text-stone-400 dark:text-stone-500">Raza</p>
+                      <p className="text-sm font-semibold text-stone-800 dark:text-stone-200 mt-0.5">{registro.lote.raza.nombre}</p>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-xs text-stone-400 dark:text-stone-500">Aves activas</p>
+                    <p className="text-sm font-bold text-stone-800 dark:text-stone-200 mt-0.5 tabular-nums">
+                      {avesRef?.toLocaleString('es-CO') ?? '—'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Input
+                    label="Fecha"
+                    type="date"
+                    error={errors.fecha?.message}
+                    {...register('fecha')}
+                  />
+                  <Select
+                    label="Galpón"
+                    options={(galpones || []).map(g => ({ value: g.id, label: g.nombre }))}
+                    placeholder="Seleccionar galpón"
+                    error={errors.galpon_id?.message}
+                    {...register('galpon_id')}
+                  />
+                </div>
 
-        {/* Campos editables */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Input
-            label="Huevos producidos"
-            type="number"
-            min="0"
-            placeholder="0"
-            error={errors.huevos_producidos?.message}
-            disabled={fueraDePlazo}
-            {...register('huevos_producidos')}
-          />
-          <Input
-            label="Consumo de alimento (kg)"
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="0.00"
-            error={errors.consumo_alimento_kg?.message}
-            disabled={fueraDePlazo}
-            {...register('consumo_alimento_kg')}
-          />
-        </div>
+                {galponId && loteActivo && (
+                  <div className="flex items-start gap-3 bg-stone-50 dark:bg-stone-800/60 border border-stone-200 dark:border-stone-700 rounded-xl px-4 py-3">
+                    <div className="w-7 h-7 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Layers className="h-3.5 w-3.5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-stone-800 dark:text-stone-200">Lote activo: {loteActivo.nombre_numero}</p>
+                      <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+                        {loteActivo.cantidad_aves_actuales?.toLocaleString('es-CO')} aves activas
+                        {loteActivo.raza?.nombre && <> · Raza: <strong>{loteActivo.raza.nombre}</strong></>}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {galponId && !loteActivo && (
+                  <InfoBox type="error">
+                    Este galpón no tiene un lote activo. Crea un lote antes de registrar producción.
+                  </InfoBox>
+                )}
+              </div>
+            )}
 
-        {superaAves && !fueraDePlazo && (
-          <InfoBox type="error">
-            Los huevos producidos no pueden superar las aves activas ({avesRef?.toLocaleString('es-CO')}).
-          </InfoBox>
-        )}
+            {duplicado && (
+              <InfoBox type="error">
+                Ya existe un registro de producción para este galpón en la fecha seleccionada.
+              </InfoBox>
+            )}
+          </FormSection>
 
-        {posturaCalc !== null && !superaAves && !fueraDePlazo && (
-          <InfoBox type="success">
-            <span>% de postura calculado: </span>
-            <strong className="text-base">{posturaCalc}%</strong>
-            <span className="text-xs ml-2 opacity-70">
-              {posturaCalc >= 90 ? '🟢 Excelente' : posturaCalc >= 75 ? '🟡 Buena' : '🔴 Baja'}
-            </span>
-          </InfoBox>
-        )}
+          {/* ── Sección: Producción del día ── */}
+          <FormSection icon={Egg} title="Producción del día" gradient="from-amber-400 to-amber-600">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Input
+                  label="Huevos producidos"
+                  type="number"
+                  min="0"
+                  placeholder="0"
+                  error={errors.huevos_producidos?.message}
+                  disabled={fueraDePlazo}
+                  {...register('huevos_producidos')}
+                />
+                {superaAves && !fueraDePlazo && (
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-1.5">
+                    No puede superar las {avesRef?.toLocaleString('es-CO')} aves activas
+                  </p>
+                )}
+              </div>
+              <Input
+                label="Consumo de alimento (kg)"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                error={errors.consumo_alimento_kg?.message}
+                disabled={fueraDePlazo}
+                {...register('consumo_alimento_kg')}
+              />
+            </div>
 
-        <Textarea
-          label="Observaciones (opcional)"
-          placeholder="Anota cualquier novedad relevante del día…"
-          rows={3}
-          disabled={fueraDePlazo}
-          {...register('observaciones')}
-        />
+            {posturaCalc !== null && !superaAves && !fueraDePlazo && (
+              <div className="border border-stone-100 dark:border-stone-800 rounded-xl p-4">
+                <PosturaGauge value={posturaCalc} />
+              </div>
+            )}
+          </FormSection>
 
-        <div className="flex gap-3 pt-1 border-t border-stone-100 dark:border-stone-800">
-          {!fueraDePlazo && (
+          {/* ── Sección: Observaciones ── */}
+          <FormSection icon={FileText} title="Observaciones" gradient="from-stone-400 to-stone-600">
+            <Textarea
+              label="Observaciones (opcional)"
+              placeholder="Anota cualquier novedad relevante del día…"
+              rows={3}
+              disabled={fueraDePlazo}
+              {...register('observaciones')}
+            />
+          </FormSection>
+
+          {/* ── Acciones ── */}
+          <div className="flex gap-3 pt-2 border-t border-stone-100 dark:border-stone-800">
+            {!fueraDePlazo && (
+              <Button
+                type="submit"
+                loading={mutation.isPending || isSubmitting}
+                disabled={isDisabled}
+              >
+                {isEdit ? 'Guardar cambios' : 'Guardar registro'}
+              </Button>
+            )}
             <Button
-              type="submit"
-              loading={mutation.isPending || isSubmitting}
-              disabled={isDisabled}
+              type="button"
+              variant="secondary"
+              onClick={() => navigate(isEdit ? `/dashboard/produccion/${id}` : '/dashboard/produccion')}
             >
-              {isEdit ? 'Guardar cambios' : 'Guardar registro'}
+              {fueraDePlazo ? 'Volver' : 'Cancelar'}
             </Button>
-          )}
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => navigate(isEdit ? `/dashboard/produccion/${id}` : '/dashboard/produccion')}
-          >
-            {fueraDePlazo ? 'Volver' : 'Cancelar'}
-          </Button>
-        </div>
-      </form>
+          </div>
+        </form>
+
+        {/* ── Vista previa (1/3) ── */}
+        <PreviewCard
+          fecha={fecha}
+          galponNombre={previewGalponNombre}
+          loteNombre={previewLoteNombre}
+          avesRef={avesRef}
+          razaNombre={previewRazaNombre}
+          huevos={huevos}
+          consumo={consumo}
+          posturaCalc={posturaCalc}
+          fueraDePlazo={fueraDePlazo}
+          horasRestantes={horasRestantes}
+          minutosRestantes={minutosRestantes}
+          isEdit={isEdit}
+          hasLote={!!loteActivo}
+          duplicado={!!duplicado}
+          superaAves={!!superaAves}
+        />
+      </div>
     </div>
   )
 }

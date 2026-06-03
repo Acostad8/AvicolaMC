@@ -137,20 +137,25 @@ function GalponCard({ galpon, isAdmin, onToggle }) {
         {/* Actions */}
         <div className="flex items-center gap-1.5 pt-3 border-t border-stone-100 dark:border-stone-800 mt-auto">
           <Link to={`/dashboard/galpones/${galpon.id}`} className="flex-1">
-            <Button variant="secondary" size="sm" icon={Eye} className="w-full justify-center text-xs">
+            <Button variant="" size="sm" icon={Eye} className="w-full justify-center text-xs border border-primary-500 dark:border-primary-400 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/25 active:bg-primary-100 dark:active:bg-primary-900/30">
               Ver detalle
             </Button>
           </Link>
           {isAdmin && (
             <>
               <Link to={`/dashboard/galpones/${galpon.id}/editar`}>
-                <Button variant="ghost" size="sm" icon={Pencil} aria-label="Editar" />
+                <Button
+                  variant="" size="sm" icon={Pencil} aria-label="Editar"
+                  className="border border-blue-400 dark:border-blue-500 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/25"
+                />
               </Link>
               <Button
-                variant="ghost"
-                size="sm"
+                variant="" size="sm"
                 onClick={() => onToggle(galpon)}
-                className={isActivo ? 'text-red-500 dark:text-red-400  hover:bg-red-50 dark:hover:bg-red-950/30' : 'text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/30'}
+                className={isActivo
+                  ? 'border border-red-400 dark:border-red-500 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/25'
+                  : 'border border-green-500 dark:border-green-500 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/25'
+                }
               >
                 {isActivo ? 'Desactivar' : 'Activar'}
               </Button>
@@ -395,11 +400,19 @@ export default function GalponesList() {
                             {isAdmin && (
                               <>
                                 <Link to={`/dashboard/galpones/${g.id}/editar`}>
-                                  <Button variant="ghost" size="sm" icon={Pencil}>Editar</Button>
+                                  <Button
+                                    variant="" size="sm" icon={Pencil}
+                                    className="border border-blue-400 dark:border-blue-500 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/25"
+                                  >
+                                    Editar
+                                  </Button>
                                 </Link>
                                 <Button
-                                  variant="ghost" size="sm"
-                                  className={g.estado === 'activo' ? 'text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30' : 'text-green-600 hover:bg-green-50 dark:hover:bg-green-950/30'}
+                                  variant="" size="sm"
+                                  className={g.estado === 'activo'
+                                    ? 'border border-red-400 dark:border-red-500 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/25'
+                                    : 'border border-green-500 dark:border-green-500 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/25'
+                                  }
                                   onClick={() => setConfirm(g)}
                                 >
                                   {g.estado === 'activo' ? 'Desactivar' : 'Activar'}

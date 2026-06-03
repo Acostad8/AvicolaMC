@@ -79,7 +79,7 @@ export default function ProduccionList() {
   const { dark } = useA11y()
 
   const [filterGalpon, setFilterGalpon] = useState('')
-  const [filterRaza, setFilterRaza]     = useState('')
+  const [filterRaza, setFilterRaza]     = useState('')   // stores raza UUID
   const [filterLote, setFilterLote]     = useState('')
   const [filterDesde, setFilterDesde]   = useState('')
   const [filterHasta, setFilterHasta]   = useState('')
@@ -110,6 +110,15 @@ export default function ProduccionList() {
     enabled: !!perfil,
   })
 
+  /* Fetch razas for the filter select */
+  const { data: razas } = useQuery({
+    queryKey: ['razas-select'],
+    queryFn: async () => {
+      const { data } = await supabase.from('razas').select('id, nombre').order('nombre')
+      return data || []
+    },
+  })
+
   /* Fetch lotes filtered by selected galpón */
   const { data: lotes } = useQuery({
     queryKey: ['lotes-select-prod', filterGalpon, isAdmin, perfil?.id],
@@ -128,9 +137,9 @@ export default function ProduccionList() {
     enabled: !!perfil,
   })
 
-  /* Fetch produccion (server filters: galpon, lote, fechas) */
+  /* Fetch produccion — all filters applied server-side */
   const { data: rawData, isLoading } = useQuery({
-    queryKey: ['produccion', isAdmin, perfil?.id, filterGalpon, filterLote, filterDesde, filterHasta],
+    queryKey: ['produccion', isAdmin, perfil?.id, filterGalpon, filterLote, filterRaza, filterDesde, filterHasta],
     queryFn: async () => {
       let q = supabase.from('produccion').select(`
         id, fecha, huevos_producidos, porcentaje_postura, consumo_alimento_kg, observaciones, created_at,
@@ -149,6 +158,21 @@ export default function ProduccionList() {
       if (filterDesde)  q = q.gte('fecha', filterDesde)
       if (filterHasta)  q = q.lte('fecha', filterHasta)
 
+      // Server-side raza filter: resolve lote_ids for the selected raza
+      if (filterRaza) {
+        let loteQ = supabase.from('lotes').select('id').eq('raza_id', filterRaza)
+        if (filterGalpon) {
+          loteQ = loteQ.eq('galpon_id', filterGalpon)
+        } else if (!isAdmin && galpones) {
+          const ids = (galpones || []).map(g => g.id)
+          if (ids.length) loteQ = loteQ.in('galpon_id', ids)
+        }
+        const { data: razaLotes } = await loteQ
+        const razaLoteIds = (razaLotes || []).map(l => l.id)
+        if (razaLoteIds.length === 0) return []
+        q = q.in('lote_id', razaLoteIds)
+      }
+
       const { data, error } = await q
       if (error) throw error
       return data || []
@@ -156,16 +180,7 @@ export default function ProduccionList() {
     enabled: !!perfil && (!(!isAdmin) || galpones !== undefined),
   })
 
-  /* Client-side raza filter */
-  const filteredData = useMemo(() => {
-    if (!filterRaza) return rawData || []
-    return (rawData || []).filter(r => r.lote?.raza?.nombre === filterRaza)
-  }, [rawData, filterRaza])
-
-  /* Unique razas from data */
-  const razasUnicas = useMemo(() =>
-    [...new Set((rawData || []).map(r => r.lote?.raza?.nombre).filter(Boolean))].sort()
-  , [rawData])
+  const filteredData = rawData || []
 
   /* KPI calculations */
   const kpis = useMemo(() => {
@@ -200,7 +215,7 @@ export default function ProduccionList() {
   const activeFilters = [
     filterGalpon && { label: `Galpón: ${galpones?.find(g => g.id === filterGalpon)?.nombre}`, clear: () => { setFilterGalpon(''); setFilterLote(''); setPage(1) } },
     filterLote   && { label: `Lote: ${lotes?.find(l => l.id === filterLote)?.nombre_numero}`,  clear: () => { setFilterLote('');   setPage(1) } },
-    filterRaza   && { label: `Raza: ${filterRaza}`,   clear: () => { setFilterRaza('');   setPage(1) } },
+    filterRaza   && { label: `Raza: ${razas?.find(r => r.id === filterRaza)?.nombre ?? filterRaza}`, clear: () => { setFilterRaza(''); setPage(1) } },
     filterDesde  && { label: `Desde: ${filterDesde}`, clear: () => { setFilterDesde('');  setPage(1) } },
     filterHasta  && { label: `Hasta: ${filterHasta}`, clear: () => { setFilterHasta('');  setPage(1) } },
   ].filter(Boolean)
@@ -270,7 +285,7 @@ export default function ProduccionList() {
               className="input-base"
               value={filterGalpon}
               onChange={e => { setFilterGalpon(e.target.value); setFilterLote(''); setPage(1) }}
-            >
+            > 
               <option value="">Todos</option>
               {(galpones || []).map(g => <option key={g.id} value={g.id}>{g.nombre}</option>)}
             </select>
@@ -295,10 +310,10 @@ export default function ProduccionList() {
               className="input-base"
               value={filterRaza}
               onChange={e => { setFilterRaza(e.target.value); setPage(1) }}
-              disabled={razasUnicas.length === 0}
+              disabled={!razas?.length}
             >
               <option value="">Todas las razas</option>
-              {razasUnicas.map(r => <option key={r} value={r}>{r}</option>)}
+              {(razas || []).map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}
             </select>
           </div>
           {/* Desde */}
@@ -414,7 +429,7 @@ export default function ProduccionList() {
             <table className="w-full text-sm">
               <thead className="bg-stone-50 dark:bg-stone-800/50 border-b border-stone-200 dark:border-stone-700">
                 <tr>
-                  {['Fecha', 'Galpón', 'Lote', 'Raza', 'Huevos', '% Postura', 'Alimento (kg)', 'Registrado por', ''].map(h => (
+                  {['Fecha', 'Galpón', 'Lote', 'Raza', 'Huevos', '% Postura', 'Alimento (kg)', 'Registrado por', ' Acciones'].map(h => (
                     <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide whitespace-nowrap">
                       {h}
                     </th>

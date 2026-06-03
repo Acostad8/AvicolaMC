@@ -1,6 +1,8 @@
-import { createContext, useContext, useState, useCallback } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import { supabase } from '../lib/supabase'
 
 const STORAGE_KEY = 'avicola-mc-config'
+const CONFIG_ID = 1
 
 export const CONFIG_DEFAULTS = {
   granja: {
@@ -18,24 +20,26 @@ export const CONFIG_DEFAULTS = {
     alerta_mortalidad:   5,
   },
   notificaciones: {
-    habilitadas:   true,   // interruptor maestro
-    sistema:       true,   // confirmaciones de acciones (guardar, editar, eliminar)
-    produccion:    true,   // alertas de producción (postura baja, registro diario)
-    mortalidad:    true,   // alertas de mortalidad alta
-    recordatorios: true,   // recordatorios y avisos del sistema
+    habilitadas:   true,
+    sistema:       true,
+    produccion:    true,
+    mortalidad:    true,
+    recordatorios: true,
   },
 }
 
-function load() {
+function mergeWithDefaults(data) {
+  return {
+    granja:         { ...CONFIG_DEFAULTS.granja,         ...(data?.granja         || {}) },
+    produccion:     { ...CONFIG_DEFAULTS.produccion,     ...(data?.produccion     || {}) },
+    notificaciones: { ...CONFIG_DEFAULTS.notificaciones, ...(data?.notificaciones || {}) },
+  }
+}
+
+function loadLocal() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return CONFIG_DEFAULTS
-    const parsed = JSON.parse(raw)
-    return {
-      granja:         { ...CONFIG_DEFAULTS.granja,         ...parsed.granja },
-      produccion:     { ...CONFIG_DEFAULTS.produccion,     ...parsed.produccion },
-      notificaciones: { ...CONFIG_DEFAULTS.notificaciones, ...parsed.notificaciones },
-    }
+    return raw ? mergeWithDefaults(JSON.parse(raw)) : CONFIG_DEFAULTS
   } catch {
     return CONFIG_DEFAULTS
   }
@@ -44,12 +48,41 @@ function load() {
 const ConfigCtx = createContext(null)
 
 export function ConfigProvider({ children }) {
-  const [config, setConfig] = useState(load)
+  // localStorage provides instant initial value while Supabase hydrates
+  const [config, setConfig] = useState(loadLocal)
+
+  useEffect(() => {
+    supabase
+      .from('configuracion')
+      .select('granja, produccion, notificaciones')
+      .eq('id', CONFIG_ID)
+      .single()
+      .then(({ data, error }) => {
+        if (error || !data) return
+        const merged = mergeWithDefaults(data)
+        setConfig(merged)
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(merged))
+      })
+  }, [])
 
   const saveSection = useCallback((section, values) => {
     setConfig(prev => {
       const next = { ...prev, [section]: { ...prev[section], ...values } }
+      // Optimistic local write so the UI never lags
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+      // Sync the full config row to Supabase
+      supabase
+        .from('configuracion')
+        .upsert({
+          id:             CONFIG_ID,
+          granja:         next.granja,
+          produccion:     next.produccion,
+          notificaciones: next.notificaciones,
+          updated_at:     new Date().toISOString(),
+        })
+        .then(({ error }) => {
+          if (error) console.error('[config] sync error:', error.message)
+        })
       return next
     })
   }, [])
