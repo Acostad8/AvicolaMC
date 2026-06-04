@@ -5,12 +5,18 @@ import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../context/AuthContext'
 import { useA11y } from '../../../context/AccessibilityContext'
 import { formatDate, formatNumber, downloadCSV, getLabelFromValue, CAUSAS_MORTALIDAD } from '../../../lib/utils'
-import { Plus, Download, Eye, Pencil, Skull, TrendingDown, CalendarDays, AlertTriangle, BarChart2, X, Filter } from 'lucide-react'
+import { Plus, Download, Eye, Pencil, Skull, TrendingDown, CalendarDays, BarChart2, X, Filter, Lock, Clock } from 'lucide-react'
 import Button from '../../../components/ui/Button'
 import PageHeader from '../../../components/ui/PageHeader'
 import Pagination from '../../../components/ui/Pagination'
 import EmptyState from '../../../components/ui/EmptyState'
 import { TableSkeleton, Skeleton } from '../../../components/ui/Skeleton'
+
+/* ── 24h edit window check ── */
+function withinEditWindow(created_at) {
+  if (!created_at) return false
+  return Date.now() - new Date(created_at).getTime() < 24 * 3600 * 1000
+}
 
 /* ── KPI Card ── */
 function KpiCard({ icon: Icon, gradient, label, value, sub, loading }) {
@@ -326,14 +332,35 @@ export default function MortalidadList() {
                       {r.registrado?.nombre_completo || '—'}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1.5">
                         <Link to={`/dashboard/mortalidad/${r.id}`}>
                           <Button variant="ghost" size="sm" icon={Eye}>Ver</Button>
                         </Link>
-                        {r.created_at && (Date.now() - new Date(r.created_at).getTime()) <= 24 * 3600 * 1000 && (
+                        {isAdmin ? (
                           <Link to={`/dashboard/mortalidad/${r.id}/editar`}>
-                            <Button variant="ghost" size="sm" icon={Pencil}>Editar</Button>
+                            <Button variant="ghost" size="sm" icon={Pencil}
+                              className="text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                            >
+                              Editar
+                            </Button>
                           </Link>
+                        ) : withinEditWindow(r.created_at) ? (
+                          <Link to={`/dashboard/mortalidad/${r.id}/editar`}>
+                            <Button variant="ghost" size="sm" icon={Clock}
+                              className="text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                              title="Editar — ventana de 24 h activa"
+                            >
+                              Editar
+                            </Button>
+                          </Link>
+                        ) : (
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-stone-400 dark:text-stone-500 bg-stone-100 dark:bg-stone-800 cursor-not-allowed select-none"
+                            title="El período de edición de 24 horas ha finalizado"
+                          >
+                            <Lock className="h-3 w-3" />
+                            Bloqueado
+                          </span>
                         )}
                       </div>
                     </td>

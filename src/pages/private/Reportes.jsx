@@ -31,6 +31,9 @@ export default function Reportes() {
   const [filterExtra,  setFilterExtra]  = useState('')
   const [sortCol,      setSortCol]      = useState('score')
   const [sortDir,      setSortDir]      = useState('desc')
+  const [page,         setPage]         = useState(0)
+
+  const PAGE_SIZE = 25
 
   /* ── Galpones list ── */
   const { data: galpones } = useQuery({
@@ -411,95 +414,135 @@ export default function Reportes() {
       </p>
     )
 
+    const totalPages = Math.ceil(reportData.length / PAGE_SIZE)
+    const pageData   = reportData.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+
+    const pager = totalPages > 1 && (
+      <div className="flex items-center justify-between px-4 py-3 border-t border-stone-100 dark:border-stone-800 text-xs text-stone-500 dark:text-stone-400">
+        <span>
+          {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, reportData.length)} de {reportData.length}{reportData.length === 500 ? '+' : ''} registros
+        </span>
+        <div className="flex items-center gap-1">
+          <button
+            disabled={page === 0}
+            onClick={() => setPage(p => p - 1)}
+            className="px-2 py-1 rounded-lg disabled:opacity-30 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors font-medium"
+          >
+            ← Anterior
+          </button>
+          <span className="px-2">{page + 1} / {totalPages}</span>
+          <button
+            disabled={page >= totalPages - 1}
+            onClick={() => setPage(p => p + 1)}
+            className="px-2 py-1 rounded-lg disabled:opacity-30 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors font-medium"
+          >
+            Siguiente →
+          </button>
+        </div>
+      </div>
+    )
+
     if (activeReport === 'produccion') return (
-      <table className="w-full text-xs">
-        <thead className="bg-stone-50 dark:bg-stone-800/50 border-b border-stone-200 dark:border-stone-700">
-          <tr>{['Fecha','Galpón','Lote','Huevos','% Postura','Alimento (kg)'].map(h => (
-            <th key={h} className="text-left px-3 py-2 font-semibold text-stone-500 dark:text-stone-400">{h}</th>
-          ))}</tr>
-        </thead>
-        <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
-          {reportData.slice(0, 15).map(r => (
-            <tr key={r.id} className="hover:bg-stone-50 dark:hover:bg-stone-800/40 transition-colors">
-              <td className="px-3 py-2 text-stone-600 dark:text-stone-400">{formatDate(r.fecha)}</td>
-              <td className="px-3 py-2 font-medium text-stone-800 dark:text-stone-100">{r.galpon?.nombre}</td>
-              <td className="px-3 py-2 text-stone-500">{r.lote?.nombre_numero}</td>
-              <td className="px-3 py-2 font-bold text-amber-600 dark:text-amber-400 tabular-nums">{r.huevos_producidos?.toLocaleString('es-CO')}</td>
-              <td className="px-3 py-2 tabular-nums text-stone-700 dark:text-stone-300">{r.porcentaje_postura}%</td>
-              <td className="px-3 py-2 text-stone-600 dark:text-stone-400">{r.consumo_alimento_kg}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <>
+        <table className="w-full text-xs">
+          <thead className="bg-stone-50 dark:bg-stone-800/50 border-b border-stone-200 dark:border-stone-700">
+            <tr>{['Fecha','Galpón','Lote','Huevos','% Postura','Alimento (kg)'].map(h => (
+              <th key={h} className="text-left px-3 py-2 font-semibold text-stone-500 dark:text-stone-400">{h}</th>
+            ))}</tr>
+          </thead>
+          <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
+            {pageData.map(r => (
+              <tr key={r.id} className="hover:bg-stone-50 dark:hover:bg-stone-800/40 transition-colors">
+                <td className="px-3 py-2 text-stone-600 dark:text-stone-400">{formatDate(r.fecha)}</td>
+                <td className="px-3 py-2 font-medium text-stone-800 dark:text-stone-100">{r.galpon?.nombre}</td>
+                <td className="px-3 py-2 text-stone-500">{r.lote?.nombre_numero}</td>
+                <td className="px-3 py-2 font-bold text-amber-600 dark:text-amber-400 tabular-nums">{r.huevos_producidos?.toLocaleString('es-CO')}</td>
+                <td className="px-3 py-2 tabular-nums text-stone-700 dark:text-stone-300">{r.porcentaje_postura}%</td>
+                <td className="px-3 py-2 text-stone-600 dark:text-stone-400">{r.consumo_alimento_kg}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {pager}
+      </>
     )
 
     if (activeReport === 'mortalidad') return (
-      <table className="w-full text-xs">
-        <thead className="bg-stone-50 dark:bg-stone-800/50 border-b border-stone-200 dark:border-stone-700">
-          <tr>{['Fecha','Galpón','Lote','Bajas','Causa','Registrado por'].map(h => (
-            <th key={h} className="text-left px-3 py-2 font-semibold text-stone-500 dark:text-stone-400">{h}</th>
-          ))}</tr>
-        </thead>
-        <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
-          {reportData.slice(0, 15).map(r => (
-            <tr key={r.id} className="hover:bg-stone-50 dark:hover:bg-stone-800/40 transition-colors">
-              <td className="px-3 py-2 text-stone-600 dark:text-stone-400">{formatDate(r.fecha)}</td>
-              <td className="px-3 py-2 font-medium text-stone-800 dark:text-stone-100">{r.galpon?.nombre}</td>
-              <td className="px-3 py-2 text-stone-500">{r.lote?.nombre_numero}</td>
-              <td className="px-3 py-2 font-bold text-red-600 dark:text-red-400 tabular-nums">{r.cantidad_bajas}</td>
-              <td className="px-3 py-2 text-stone-700 dark:text-stone-300">{getLabelFromValue(CAUSAS_MORTALIDAD, r.causa)}</td>
-              <td className="px-3 py-2 text-stone-400 dark:text-stone-500">{r.registrado?.nombre_completo || '—'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <>
+        <table className="w-full text-xs">
+          <thead className="bg-stone-50 dark:bg-stone-800/50 border-b border-stone-200 dark:border-stone-700">
+            <tr>{['Fecha','Galpón','Lote','Bajas','Causa','Registrado por'].map(h => (
+              <th key={h} className="text-left px-3 py-2 font-semibold text-stone-500 dark:text-stone-400">{h}</th>
+            ))}</tr>
+          </thead>
+          <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
+            {pageData.map(r => (
+              <tr key={r.id} className="hover:bg-stone-50 dark:hover:bg-stone-800/40 transition-colors">
+                <td className="px-3 py-2 text-stone-600 dark:text-stone-400">{formatDate(r.fecha)}</td>
+                <td className="px-3 py-2 font-medium text-stone-800 dark:text-stone-100">{r.galpon?.nombre}</td>
+                <td className="px-3 py-2 text-stone-500">{r.lote?.nombre_numero}</td>
+                <td className="px-3 py-2 font-bold text-red-600 dark:text-red-400 tabular-nums">{r.cantidad_bajas}</td>
+                <td className="px-3 py-2 text-stone-700 dark:text-stone-300">{getLabelFromValue(CAUSAS_MORTALIDAD, r.causa)}</td>
+                <td className="px-3 py-2 text-stone-400 dark:text-stone-500">{r.registrado?.nombre_completo || '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {pager}
+      </>
     )
 
     if (activeReport === 'tratamientos') return (
-      <table className="w-full text-xs">
-        <thead className="bg-stone-50 dark:bg-stone-800/50 border-b border-stone-200 dark:border-stone-700">
-          <tr>{['Inicio','Galpón','Tipo','Producto','Responsable','Estado'].map(h => (
-            <th key={h} className="text-left px-3 py-2 font-semibold text-stone-500 dark:text-stone-400">{h}</th>
-          ))}</tr>
-        </thead>
-        <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
-          {reportData.slice(0, 15).map(r => (
-            <tr key={r.id} className="hover:bg-stone-50 dark:hover:bg-stone-800/40 transition-colors">
-              <td className="px-3 py-2 text-stone-600 dark:text-stone-400">{formatDate(r.fecha_inicio)}</td>
-              <td className="px-3 py-2 font-medium text-stone-800 dark:text-stone-100">{r.galpon?.nombre}</td>
-              <td className="px-3 py-2 text-stone-700 dark:text-stone-300">{getLabelFromValue(TIPOS_TRATAMIENTO, r.tipo)}</td>
-              <td className="px-3 py-2 text-stone-600 dark:text-stone-400">{r.nombre_producto}</td>
-              <td className="px-3 py-2 text-stone-500">{r.responsable || '—'}</td>
-              <td className="px-3 py-2"><StatusBadge status={r.estado} /></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <>
+        <table className="w-full text-xs">
+          <thead className="bg-stone-50 dark:bg-stone-800/50 border-b border-stone-200 dark:border-stone-700">
+            <tr>{['Inicio','Galpón','Tipo','Producto','Responsable','Estado'].map(h => (
+              <th key={h} className="text-left px-3 py-2 font-semibold text-stone-500 dark:text-stone-400">{h}</th>
+            ))}</tr>
+          </thead>
+          <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
+            {pageData.map(r => (
+              <tr key={r.id} className="hover:bg-stone-50 dark:hover:bg-stone-800/40 transition-colors">
+                <td className="px-3 py-2 text-stone-600 dark:text-stone-400">{formatDate(r.fecha_inicio)}</td>
+                <td className="px-3 py-2 font-medium text-stone-800 dark:text-stone-100">{r.galpon?.nombre}</td>
+                <td className="px-3 py-2 text-stone-700 dark:text-stone-300">{getLabelFromValue(TIPOS_TRATAMIENTO, r.tipo)}</td>
+                <td className="px-3 py-2 text-stone-600 dark:text-stone-400">{r.nombre_producto}</td>
+                <td className="px-3 py-2 text-stone-500">{r.responsable || '—'}</td>
+                <td className="px-3 py-2"><StatusBadge status={r.estado} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {pager}
+      </>
     )
 
     if (activeReport === 'insumos') return (
-      <table className="w-full text-xs">
-        <thead className="bg-stone-50 dark:bg-stone-800/50 border-b border-stone-200 dark:border-stone-700">
-          <tr>{['Producto','Categoría','Unidad','Stock actual','Stock mínimo','Estado'].map(h => (
-            <th key={h} className="text-left px-3 py-2 font-semibold text-stone-500 dark:text-stone-400">{h}</th>
-          ))}</tr>
-        </thead>
-        <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
-          {reportData.slice(0, 15).map(r => {
-            const bajo = r.stock_actual <= r.stock_minimo
-            return (
-              <tr key={r.id} className="hover:bg-stone-50 dark:hover:bg-stone-800/40 transition-colors">
-                <td className="px-3 py-2 font-medium text-stone-800 dark:text-stone-100">{r.nombre}</td>
-                <td className="px-3 py-2 text-stone-600 dark:text-stone-400">{r.categoria}</td>
-                <td className="px-3 py-2 text-stone-500">{r.unidad_medida}</td>
-                <td className={`px-3 py-2 font-semibold tabular-nums ${bajo ? 'text-red-600 dark:text-red-400' : 'text-stone-800 dark:text-stone-100'}`}>{r.stock_actual}</td>
-                <td className="px-3 py-2 text-stone-500 tabular-nums">{r.stock_minimo}</td>
-                <td className="px-3 py-2"><StatusBadge status={r.estado} /></td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+      <>
+        <table className="w-full text-xs">
+          <thead className="bg-stone-50 dark:bg-stone-800/50 border-b border-stone-200 dark:border-stone-700">
+            <tr>{['Producto','Categoría','Unidad','Stock actual','Stock mínimo','Estado'].map(h => (
+              <th key={h} className="text-left px-3 py-2 font-semibold text-stone-500 dark:text-stone-400">{h}</th>
+            ))}</tr>
+          </thead>
+          <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
+            {pageData.map(r => {
+              const bajo = r.stock_actual <= r.stock_minimo
+              return (
+                <tr key={r.id} className="hover:bg-stone-50 dark:hover:bg-stone-800/40 transition-colors">
+                  <td className="px-3 py-2 font-medium text-stone-800 dark:text-stone-100">{r.nombre}</td>
+                  <td className="px-3 py-2 text-stone-600 dark:text-stone-400">{r.categoria}</td>
+                  <td className="px-3 py-2 text-stone-500">{r.unidad_medida}</td>
+                  <td className={`px-3 py-2 font-semibold tabular-nums ${bajo ? 'text-red-600 dark:text-red-400' : 'text-stone-800 dark:text-stone-100'}`}>{r.stock_actual}</td>
+                  <td className="px-3 py-2 text-stone-500 tabular-nums">{r.stock_minimo}</td>
+                  <td className="px-3 py-2"><StatusBadge status={r.estado} /></td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+        {pager}
+      </>
     )
 
     return null
@@ -531,6 +574,7 @@ export default function Reportes() {
                 onClick={() => {
                   setActiveReport(r.id)
                   setFilterExtra('')
+                  setPage(0)
                   if (r.id === 'comparativa') setFilterGalpon('')
                 }}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
@@ -561,7 +605,7 @@ export default function Reportes() {
               {!isComparativa && (
                 <div>
                   <label className="label text-xs">Galpón</label>
-                  <select className="input-base" value={filterGalpon} onChange={e => setFilterGalpon(e.target.value)}>
+                  <select className="input-base" value={filterGalpon} onChange={e => { setFilterGalpon(e.target.value); setPage(0) }}>
                     <option value="">Todos</option>
                     {(galpones || []).map(g => <option key={g.id} value={g.id}>{g.nombre}</option>)}
                   </select>
@@ -571,7 +615,7 @@ export default function Reportes() {
               {activeReport === 'mortalidad' && (
                 <div>
                   <label className="label text-xs">Causa</label>
-                  <select className="input-base" value={filterExtra} onChange={e => setFilterExtra(e.target.value)}>
+                  <select className="input-base" value={filterExtra} onChange={e => { setFilterExtra(e.target.value); setPage(0) }}>
                     <option value="">Todas las causas</option>
                     {CAUSAS_MORTALIDAD.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                   </select>
@@ -581,7 +625,7 @@ export default function Reportes() {
               {activeReport === 'tratamientos' && (
                 <div>
                   <label className="label text-xs">Tipo</label>
-                  <select className="input-base" value={filterExtra} onChange={e => setFilterExtra(e.target.value)}>
+                  <select className="input-base" value={filterExtra} onChange={e => { setFilterExtra(e.target.value); setPage(0) }}>
                     <option value="">Todos los tipos</option>
                     {TIPOS_TRATAMIENTO.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                   </select>
@@ -592,11 +636,11 @@ export default function Reportes() {
                 <>
                   <div>
                     <label className="label text-xs">Desde</label>
-                    <input type="date" className="input-base" value={filterDesde} onChange={e => setFilterDesde(e.target.value)} />
+                    <input type="date" className="input-base" value={filterDesde} onChange={e => { setFilterDesde(e.target.value); setPage(0) }} />
                   </div>
                   <div>
                     <label className="label text-xs">Hasta</label>
-                    <input type="date" className="input-base" value={filterHasta} onChange={e => setFilterHasta(e.target.value)} />
+                    <input type="date" className="input-base" value={filterHasta} onChange={e => { setFilterHasta(e.target.value); setPage(0) }} />
                   </div>
                 </>
               )}
@@ -651,12 +695,7 @@ export default function Reportes() {
                 </div>
               )}
               <p className="text-sm font-medium text-stone-700 dark:text-stone-200">
-                {isComparativa ? 'Ranking de galpones' : 'Vista previa'}
-                {!isComparativa && reportData && reportData.length > 15 && (
-                  <span className="ml-1.5 text-xs text-stone-400 dark:text-stone-500 font-normal">
-                    (primeros 15 de {reportData.length}{reportData.length === 500 ? '+' : ''})
-                  </span>
-                )}
+                {isComparativa ? 'Ranking de galpones' : 'Resultados'}
               </p>
               {!isComparativa && reportData?.length === 500 && (
                 <span className="ml-auto text-xs text-amber-600 dark:text-amber-400 font-medium">

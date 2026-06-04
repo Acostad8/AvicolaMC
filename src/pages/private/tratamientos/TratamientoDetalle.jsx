@@ -9,7 +9,7 @@ import { Skeleton } from '../../../components/ui/Skeleton'
 import {
   Pencil, Download, Syringe, Pill, FlaskConical, Shield,
   Bug, Activity, Building2, Calendar, CalendarCheck,
-  User, ClipboardList, Package, Beaker, CheckCircle2, Clock3, Clock,
+  User, ClipboardList, Package, Beaker, CheckCircle2, Clock3, Clock, Lock, ShieldCheck,
 } from 'lucide-react'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -180,6 +180,13 @@ export default function TratamientoDetalle() {
   const isActivo    = t.estado === 'activo'
   const hasFechaFin = !!t.fecha_fin
 
+  const msTranscurridos = t.created_at ? Date.now() - new Date(t.created_at).getTime() : Infinity
+  const dentroDeVentana = msTranscurridos <= 86_400_000
+  const canEdit         = isAdmin || dentroDeVentana
+  const msRestantes     = Math.max(0, 86_400_000 - msTranscurridos)
+  const horasRestantes  = Math.floor(msRestantes / 3_600_000)
+  const minsRestantes   = Math.floor((msRestantes % 3_600_000) / 60_000)
+
   return (
     <div className="w-full space-y-5">
       <PageHeader
@@ -192,7 +199,7 @@ export default function TratamientoDetalle() {
         actions={
           <div className="flex gap-2">
             <Button variant="secondary" icon={Download} onClick={downloadPDF}>PDF</Button>
-            {isAdmin && (
+            {canEdit && (
               <Link to={`/dashboard/tratamientos/${id}/editar`}>
                 <Button variant="secondary" icon={Pencil}>Editar</Button>
               </Link>
@@ -344,6 +351,41 @@ export default function TratamientoDetalle() {
             </div>
           </div>
 
+          
+          {/* Estado de edición */}
+          {isAdmin ? (
+            <div className="card p-4 flex items-start gap-3 bg-blue-50/60 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/50">
+              <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/40 rounded-lg flex items-center justify-center flex-shrink-0">
+                <ShieldCheck className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-blue-800 dark:text-blue-300">Acceso administrador</p>
+                <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">Puedes editar este registro en cualquier momento.</p>
+              </div>
+            </div>
+          ) : dentroDeVentana ? (
+            <div className="card p-4 flex items-start gap-3 bg-amber-50/60 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
+              <div className="w-8 h-8 bg-amber-100 dark:bg-amber-900/40 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">Ventana de edición activa</p>
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">Tiempo restante: <strong>{horasRestantes}h {minsRestantes}min</strong></p>
+              </div>
+            </div>
+          ) : (
+            <div className="card p-4 flex items-start gap-3">
+              <div className="w-8 h-8 bg-stone-100 dark:bg-stone-800 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Lock className="h-4 w-4 text-stone-400 dark:text-stone-500" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-stone-600 dark:text-stone-400">Registro bloqueado</p>
+                <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">La ventana de 24 h ha finalizado.</p>
+              </div>
+            </div>
+          )}
+
+
           {/* Fechas */}
           <SideCard title="Fechas" icon={Calendar} gradient="from-blue-400 to-blue-600">
             <div className="space-y-3">
@@ -378,7 +420,7 @@ export default function TratamientoDetalle() {
               <Download className="h-4 w-4 text-stone-400" />
               Descargar PDF
             </button>
-            {isAdmin && (
+            {canEdit && (
               <Link to={`/dashboard/tratamientos/${id}/editar`} className="block">
                 <div className="w-full flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-stone-50 dark:bg-stone-800 hover:bg-stone-100 dark:hover:bg-stone-700/80 transition-colors text-sm font-medium text-stone-700 dark:text-stone-200 border border-stone-200 dark:border-stone-700">
                   <Pencil className="h-4 w-4 text-stone-400" />

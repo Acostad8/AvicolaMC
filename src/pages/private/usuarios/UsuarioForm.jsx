@@ -62,24 +62,35 @@ function AvatarInitials({ name, rol }) {
   )
 }
 
-function CheckList({ items, selected, onToggle, emptyText }) {
+function RadioGalpon({ items, selected, onChange, emptyText }) {
   return (
     <div className="border border-stone-200 dark:border-stone-700 rounded-xl overflow-hidden">
       {items.length === 0 ? (
         <p className="text-stone-400 dark:text-stone-500 text-xs px-4 py-3">{emptyText}</p>
       ) : (
         <div className="max-h-44 overflow-y-auto divide-y divide-stone-100 dark:divide-stone-800">
+          {/* Opción "Sin galpón" */}
+          <button
+            type="button"
+            onClick={() => onChange('')}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-stone-50 dark:hover:bg-stone-800/60 ${!selected ? 'bg-stone-50 dark:bg-stone-800/40' : ''}`}
+          >
+            <div className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 border-2 transition-colors ${!selected ? 'border-stone-400 dark:border-stone-500' : 'border-stone-300 dark:border-stone-600'}`}>
+              {!selected && <div className="w-2 h-2 rounded-full bg-stone-400 dark:bg-stone-500" />}
+            </div>
+            <span className="text-sm italic text-stone-400 dark:text-stone-500">Sin asignar</span>
+          </button>
           {items.map(item => (
             <button
               key={item.id}
               type="button"
-              onClick={() => onToggle(item.id)}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-stone-50 dark:hover:bg-stone-800/60 ${selected.includes(item.id) ? 'bg-primary-50 dark:bg-primary-950/20' : ''}`}
+              onClick={() => onChange(item.id)}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-stone-50 dark:hover:bg-stone-800/60 ${selected === item.id ? 'bg-primary-50 dark:bg-primary-950/20' : ''}`}
             >
-              <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border transition-colors ${selected.includes(item.id) ? 'bg-primary-500 border-primary-500' : 'border-stone-300 dark:border-stone-600'}`}>
-                {selected.includes(item.id) && <Check className="h-2.5 w-2.5 text-white" />}
+              <div className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 border-2 transition-colors ${selected === item.id ? 'border-primary-500' : 'border-stone-300 dark:border-stone-600'}`}>
+                {selected === item.id && <div className="w-2 h-2 rounded-full bg-primary-500" />}
               </div>
-              <span className={`text-sm ${selected.includes(item.id) ? 'text-primary-700 dark:text-primary-300 font-medium' : 'text-stone-700 dark:text-stone-300'}`}>
+              <span className={`text-sm ${selected === item.id ? 'text-primary-700 dark:text-primary-300 font-medium' : 'text-stone-700 dark:text-stone-300'}`}>
                 {item.nombre}
               </span>
             </button>
@@ -90,7 +101,7 @@ function CheckList({ items, selected, onToggle, emptyText }) {
   )
 }
 
-function PreviewCard({ nombre, email, rol, estado, galponesSeleccionados, galpones, empleadoNombre, emailDuplicado, isEdit }) {
+function PreviewCard({ nombre, email, rol, estado, galponSeleccionado, galpones, empleadoNombre, emailDuplicado, isEdit }) {
   const rolConfig = rol === 'administrador'
     ? { label: 'Administrador', bg: 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-800', gradient: 'from-violet-400 to-violet-600' }
     : { label: 'Encargado',     bg: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800',             gradient: 'from-blue-400 to-blue-600' }
@@ -99,13 +110,13 @@ function PreviewCard({ nombre, email, rol, estado, galponesSeleccionados, galpon
     ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
     : 'bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800'
 
-  const galponesNombres = (galpones || []).filter(g => galponesSeleccionados.includes(g.id)).map(g => g.nombre)
+  const galponNombre = (galpones || []).find(g => g.id === galponSeleccionado)?.nombre
 
   const checks = [
-    { ok: nombre?.length > 0,   text: 'Nombre completo' },
+    { ok: nombre?.length > 0,        text: 'Nombre completo' },
     { ok: !!email && !emailDuplicado, text: 'Correo único y válido' },
-    { ok: !!rol,                text: 'Rol asignado' },
-    ...(rol === 'encargado' ? [{ ok: galponesSeleccionados.length > 0, text: 'Galpones asignados' }] : []),
+    { ok: !!rol,                      text: 'Rol asignado' },
+    ...(rol === 'encargado' ? [{ ok: !!galponSeleccionado, text: 'Galpón asignado' }] : []),
   ]
 
   return (
@@ -158,16 +169,13 @@ function PreviewCard({ nombre, email, rol, estado, galponesSeleccionados, galpon
             </div>
           )}
 
-          {/* Galpones (encargado) */}
+          {/* Galpón (encargado) */}
           {rol === 'encargado' && (
-            <div className="bg-white/60 dark:bg-stone-800/60 rounded-lg px-3 py-2">
-              <p className="text-xs text-stone-400 dark:text-stone-500">Galpones asignados</p>
-              <p className="text-lg font-bold text-stone-800 dark:text-stone-100 tabular-nums mt-0.5">{galponesSeleccionados.length}</p>
-              {galponesNombres.length > 0 && (
-                <p className="text-[10px] text-stone-400 dark:text-stone-500 mt-0.5 line-clamp-2 leading-relaxed">
-                  {galponesNombres.slice(0, 3).join(', ')}{galponesNombres.length > 3 ? ` +${galponesNombres.length - 3}` : ''}
-                </p>
-              )}
+            <div className={`rounded-lg px-3 py-2 ${galponSeleccionado ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-white/60 dark:bg-stone-800/60'}`}>
+              <p className="text-xs text-stone-400 dark:text-stone-500">Galpón asignado</p>
+              <p className={`text-sm font-semibold mt-0.5 ${galponSeleccionado ? 'text-emerald-700 dark:text-emerald-400' : 'text-stone-400 dark:text-stone-500 italic'}`}>
+                {galponNombre || 'Sin asignar'}
+              </p>
             </div>
           )}
         </div>
@@ -211,7 +219,7 @@ export default function UsuarioForm() {
   const estado      = watch('estado')
   const empleadoId  = watch('empleado_id')
 
-  const [selectedGalpones, setSelectedGalpones] = useState([])
+  const [selectedGalpon, setSelectedGalpon] = useState('')
 
   /* ── Empleados disponibles ── */
   const { data: empleados } = useQuery({
@@ -269,16 +277,16 @@ export default function UsuarioForm() {
     enabled: isEdit,
   })
 
-  const { data: galponesAsignados } = useQuery({
-    queryKey: ['galpones-encargado', id],
+  const { data: galponAsignado } = useQuery({
+    queryKey: ['galpon-encargado', id],
     queryFn: async () => {
-      const { data } = await supabase.from('galpones').select('id').eq('encargado_id', id)
-      return (data || []).map(g => g.id)
+      const { data } = await supabase.from('galpones').select('id').eq('encargado_id', id).maybeSingle()
+      return data?.id || ''
     },
     enabled: isEdit,
   })
 
-  useEffect(() => { if (galponesAsignados) setSelectedGalpones(galponesAsignados) }, [galponesAsignados])
+  useEffect(() => { if (galponAsignado !== undefined) setSelectedGalpon(galponAsignado) }, [galponAsignado])
   useEffect(() => {
     if (usuario) reset({
       nombre_completo: usuario.nombre_completo, email: usuario.email || '',
@@ -307,8 +315,8 @@ export default function UsuarioForm() {
 
         if (values.rol === 'encargado') {
           await supabase.from('galpones').update({ encargado_id: null }).eq('encargado_id', id)
-          if (selectedGalpones.length > 0) {
-            await supabase.from('galpones').update({ encargado_id: id }).in('id', selectedGalpones)
+          if (selectedGalpon) {
+            await supabase.from('galpones').update({ encargado_id: id }).eq('id', selectedGalpon)
           }
         }
       } else {
@@ -325,8 +333,8 @@ export default function UsuarioForm() {
         })
         if (error) throw error
 
-        if (values.rol === 'encargado' && selectedGalpones.length > 0) {
-          await supabase.from('galpones').update({ encargado_id: fnData.user.id }).in('id', selectedGalpones)
+        if (values.rol === 'encargado' && selectedGalpon) {
+          await supabase.from('galpones').update({ encargado_id: fnData.user.id }).eq('id', selectedGalpon)
         }
       }
     },
@@ -338,10 +346,6 @@ export default function UsuarioForm() {
     },
     onError: e => toast.error(e.message || 'Error al guardar'),
   })
-
-  function toggleGalpon(galponId) {
-    setSelectedGalpones(prev => prev.includes(galponId) ? prev.filter(x => x !== galponId) : [...prev, galponId])
-  }
 
   return (
     <div className="w-full space-y-5">
@@ -440,13 +444,16 @@ export default function UsuarioForm() {
             </div>
           </FormSection>
 
-          {/* ── Galpones asignados (solo encargado) ── */}
+          {/* ── Galpón asignado (solo encargado, máximo 1) ── */}
           {rolWatch === 'encargado' && (
-            <FormSection icon={Building2} title={`Galpones asignados (${selectedGalpones.length})`} gradient="from-emerald-400 to-emerald-600">
-              <CheckList
+            <FormSection icon={Building2} title="Galpón asignado" gradient="from-emerald-400 to-emerald-600">
+              <p className="text-xs text-stone-400 dark:text-stone-500 mb-2">
+                Cada encargado puede estar asignado a un solo galpón a la vez.
+              </p>
+              <RadioGalpon
                 items={galpones || []}
-                selected={selectedGalpones}
-                onToggle={toggleGalpon}
+                selected={selectedGalpon}
+                onChange={setSelectedGalpon}
                 emptyText="No hay galpones activos registrados"
               />
             </FormSection>
@@ -509,7 +516,7 @@ export default function UsuarioForm() {
           email={emailValue}
           rol={rolWatch}
           estado={estado}
-          galponesSeleccionados={selectedGalpones}
+          galponSeleccionado={selectedGalpon}
           galpones={galpones}
           empleadoNombre={empleadoNombre}
           emailDuplicado={emailDuplicado}

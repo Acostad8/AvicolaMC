@@ -20,7 +20,7 @@ export default function AccessibilityPanel() {
       {/* Floating toggle */}
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-50 w-12 h-12 bg-primary-600 hover:bg-primary-700 text-white rounded-full shadow-xl flex items-center justify-center transition-all hover:scale-110 focus-visible:ring-2 focus-visible:ring-primary-400"
+        className="fixed bottom-2 right-2 z-50 w-12 h-12 bg-primary-600 hover:bg-primary-700 text-white rounded-full shadow-xl flex items-center justify-center transition-all hover:scale-110 focus-visible:ring-2 focus-visible:ring-primary-400"
         aria-label="Abrir panel de accesibilidad"
       >
         <Accessibility className="w-5 h-5" />
@@ -113,12 +113,12 @@ export default function AccessibilityPanel() {
             <button
               onClick={() => setNoMotion(!noMotion)}
               role="switch"
-              aria-checked={!noMotion}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all ${!noMotion ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400' : 'border-stone-200 dark:border-stone-700 text-stone-500 dark:text-stone-400'}`}
+              aria-checked={noMotion}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all ${noMotion ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400' : 'border-stone-200 dark:border-stone-700 text-stone-500 dark:text-stone-400'}`}
             >
               <span>{noMotion ? 'Desactivadas' : 'Activadas'}</span>
-              <div className={`relative w-10 h-6 rounded-full transition-colors duration-200 ${!noMotion ? 'bg-primary-500' : 'bg-stone-300 dark:bg-stone-600'}`}>
-                <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${!noMotion ? 'translate-x-5' : 'translate-x-1'}`} />
+              <div className={`a11y-toggle-switch relative w-11 h-6 rounded-full overflow-hidden transition-colors duration-200 ${noMotion ? 'bg-primary-500' : 'bg-stone-300 dark:bg-stone-600'}`}>
+                <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all duration-200 ${noMotion ? 'left-6' : 'left-1'}`} />
               </div>
             </button>
           </section>

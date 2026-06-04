@@ -138,15 +138,18 @@ function PreviewCard({
           )}
         </div>
 
-        {/* Tiempo restante */}
+        {/* Tiempo restante / acceso admin */}
         {isEdit && !fueraDePlazo && (
-          <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2.5">
-            <Clock className="h-4 w-4 text-amber-500 flex-shrink-0" />
-            <div>
-              <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">Ventana de edición</p>
-              <p className="text-xs text-amber-700 dark:text-amber-400 tabular-nums">{horasRestantes}h {minutosRestantes}min restantes</p>
-            </div>
-          </div>
+          horasRestantes > 0 || minutosRestantes > 0
+            ? (
+              <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2.5">
+                <Clock className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                <div>
+                  <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">Ventana de edición</p>
+                  <p className="text-xs text-amber-700 dark:text-amber-400 tabular-nums">{horasRestantes}h {minutosRestantes}min restantes</p>
+                </div>
+              </div>
+            ) : null
         )}
 
         {/* Checklist */}
@@ -213,7 +216,7 @@ export default function MortalidadForm() {
   }, [registro, reset])
 
   const msTranscurridos  = msDesdeCreacion(registro?.created_at)
-  const fueraDePlazo     = isEdit && msTranscurridos > 24 * 3600 * 1000
+  const fueraDePlazo     = isEdit && !isAdmin && msTranscurridos > 24 * 3600 * 1000
   const msRestantes      = Math.max(0, 24 * 3600 * 1000 - msTranscurridos)
   const horasRestantes   = Math.floor(msRestantes / 3600000)
   const minutosRestantes = Math.floor((msRestantes % 3600000) / 60000)

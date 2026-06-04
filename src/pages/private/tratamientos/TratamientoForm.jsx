@@ -9,7 +9,7 @@ import { useAuth } from '../../../context/AuthContext'
 import { TIPOS_TRATAMIENTO } from '../../../lib/utils'
 import {
   FlaskConical, Info, Building2, Layers, CheckCircle2,
-  AlertCircle, Package, User, CalendarDays, Activity,
+  AlertCircle, AlertTriangle, Package, User, CalendarDays, Activity,
 } from 'lucide-react'
 import Input from '../../../components/ui/Input'
 import Select from '../../../components/ui/Select'
@@ -198,11 +198,11 @@ function PreviewCard({ galponNombre, loteNombre, tipoLabel, insumoNombre, insumo
 }
 
 export default function TratamientoForm() {
-  const { id }     = useParams()
-  const isEdit     = !!id
-  const navigate   = useNavigate()
-  const qc         = useQueryClient()
-  const { perfil } = useAuth()
+  const { id }              = useParams()
+  const isEdit              = !!id
+  const navigate            = useNavigate()
+  const qc                  = useQueryClient()
+  const { perfil, isAdmin } = useAuth()
 
   const schema = useMemo(() => z.object({
     fecha_inicio:     z.string().min(1, 'Requerido'),
@@ -285,6 +285,11 @@ export default function TratamientoForm() {
       estado: tratamiento.estado, observaciones: tratamiento.observaciones || '',
     })
   }, [tratamiento, reset])
+
+  const msTranscurridos = tratamiento?.created_at
+    ? Date.now() - new Date(tratamiento.created_at).getTime()
+    : 0
+  const fueraDePlazo    = isEdit && !isAdmin && msTranscurridos > 24 * 3600 * 1000
 
   const insumosFiltrados = useMemo(() => {
     if (!insumos) return []
@@ -375,6 +380,13 @@ export default function TratamientoForm() {
         ]}
       />
 
+      {isEdit && fueraDePlazo && (
+        <div className="flex items-start gap-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3 text-sm text-red-700 dark:text-red-400">
+          <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+          <span>El período de edición de 24 horas ha vencido. Este registro ya no puede modificarse.</span>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
         {/* ── Formulario (2/3) ── */}
@@ -398,14 +410,15 @@ export default function TratamientoForm() {
           {/* ── Fechas y galpón ── */}
           <FormSection icon={CalendarDays} title="Fechas y galpón" gradient="from-blue-400 to-blue-600">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input label="Fecha de inicio" type="date" error={errors.fecha_inicio?.message} {...register('fecha_inicio')} />
-              <Input label="Fecha de fin (opcional)" type="date" {...register('fecha_fin')} />
+              <Input label="Fecha de inicio" type="date" error={errors.fecha_inicio?.message} disabled={fueraDePlazo} {...register('fecha_inicio')} />
+              <Input label="Fecha de fin (opcional)" type="date" disabled={fueraDePlazo} {...register('fecha_fin')} />
               <div className="sm:col-span-2">
                 <Select
                   label="Galpón"
                   options={(galpones || []).map(g => ({ value: g.id, label: g.nombre }))}
                   placeholder="Seleccionar galpón"
                   error={errors.galpon_id?.message}
+                  disabled={fueraDePlazo}
                   {...register('galpon_id')}
                 />
               </div>
@@ -437,6 +450,7 @@ export default function TratamientoForm() {
                   options={TIPOS_TRATAMIENTO}
                   placeholder="Seleccionar tipo"
                   error={errors.tipo?.message}
+                  disabled={fueraDePlazo}
                   {...register('tipo')}
                 />
               </div>
@@ -505,12 +519,14 @@ export default function TratamientoForm() {
                 label="Veterinario / encargado"
                 placeholder="Nombre del responsable"
                 error={errors.responsable?.message}
+                disabled={fueraDePlazo}
                 {...register('responsable')}
               />
               <Input
                 label="Dosis y forma de aplicación"
                 placeholder="Ej: 1 mL por litro de agua, vía oral"
                 error={errors.dosis_aplicacion?.message}
+                disabled={fueraDePlazo}
                 {...register('dosis_aplicacion')}
               />
             </FormSection>
@@ -523,12 +539,14 @@ export default function TratamientoForm() {
                   { value: 'finalizado', label: 'Finalizado' },
                 ]}
                 error={errors.estado?.message}
+                disabled={fueraDePlazo}
                 {...register('estado')}
               />
               <Textarea
                 label="Observaciones (opcional)"
                 placeholder="Notas, reacciones observadas, indicaciones…"
                 rows={3}
+                disabled={fueraDePlazo}
                 {...register('observaciones')}
               />
             </FormSection>
@@ -536,15 +554,17 @@ export default function TratamientoForm() {
 
           {/* Acciones */}
           <div className="flex gap-3 pt-2 border-t border-stone-100 dark:border-stone-800">
-            <Button
-              type="submit"
-              loading={mutation.isPending || isSubmitting}
-              disabled={stockInsuficiente || sinStock}
-            >
-              {isEdit ? 'Guardar cambios' : 'Registrar tratamiento'}
-            </Button>
-            <Button type="button" variant="secondary" onClick={() => navigate('/dashboard/tratamientos')}>
-              Cancelar
+            {!fueraDePlazo && (
+              <Button
+                type="submit"
+                loading={mutation.isPending || isSubmitting}
+                disabled={stockInsuficiente || sinStock}
+              >
+                {isEdit ? 'Guardar cambios' : 'Registrar tratamiento'}
+              </Button>
+            )}
+            <Button type="button" variant="secondary" onClick={() => navigate(isEdit ? `/dashboard/tratamientos/${id}` : '/dashboard/tratamientos')}>
+              {fueraDePlazo ? 'Volver' : 'Cancelar'}
             </Button>
           </div>
         </form>

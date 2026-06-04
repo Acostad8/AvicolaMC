@@ -1,13 +1,14 @@
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
+import { useAuth } from '../../../context/AuthContext'
 import { formatDate, formatNumber, getLabelFromValue, CAUSAS_MORTALIDAD } from '../../../lib/utils'
 import PageHeader from '../../../components/ui/PageHeader'
 import Button from '../../../components/ui/Button'
 import { Skeleton } from '../../../components/ui/Skeleton'
 import AuditHistorial from '../../../components/ui/AuditHistorial'
 import {
-  Pencil, Clock, Lock,
+  Pencil, Clock, Lock, ShieldCheck,
   Building2, Calendar, AlertTriangle,
   FileText, Skull, TrendingDown,
 } from 'lucide-react'
@@ -58,6 +59,7 @@ function InfoRow({ label, value, accent }) {
 
 export default function MortalidadDetalle() {
   const { id } = useParams()
+  const { isAdmin } = useAuth()
 
   const { data: reg, isLoading } = useQuery({
     queryKey: ['mortalidad-detalle', id],
@@ -103,6 +105,7 @@ export default function MortalidadDetalle() {
 
   const msTranscurridos  = msDesdeCreacion(reg.created_at)
   const dentroDeVentana  = msTranscurridos <= 86_400_000
+  const canEdit          = isAdmin || dentroDeVentana
   const msRestantes      = Math.max(0, 86_400_000 - msTranscurridos)
   const horasRestantes   = Math.floor(msRestantes / 3_600_000)
   const minsRestantes    = Math.floor((msRestantes % 3_600_000) / 60_000)
@@ -120,7 +123,7 @@ export default function MortalidadDetalle() {
           { label: 'Mortalidad', href: '/dashboard/mortalidad' },
           { label: 'Detalle' },
         ]}
-        actions={dentroDeVentana && (
+        actions={canEdit && (
           <Link to={`/dashboard/mortalidad/${id}/editar`}>
             <Button variant="secondary" icon={Pencil}>Editar</Button>
           </Link>
@@ -176,30 +179,6 @@ export default function MortalidadDetalle() {
             </div>
           </div>
 
-          {/* Ventana de edición */}
-          {dentroDeVentana ? (
-            <div className="flex items-center gap-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3">
-              <div className="w-8 h-8 bg-amber-100 dark:bg-amber-900/40 rounded-lg flex items-center justify-center flex-shrink-0">
-                <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-              </div>
-              <div className="flex-1">
-                <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">Ventana de edición activa</p>
-                <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
-                  Puedes editar este registro por <strong>{horasRestantes}h {minsRestantes}min</strong> más
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center gap-3 bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700 rounded-xl px-4 py-3">
-              <div className="w-8 h-8 bg-stone-100 dark:bg-stone-800 rounded-lg flex items-center justify-center flex-shrink-0">
-                <Lock className="h-4 w-4 text-stone-400 dark:text-stone-500" />
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-stone-600 dark:text-stone-400">Registro bloqueado</p>
-                <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">El período de edición de 24 horas ha finalizado</p>
-              </div>
-            </div>
-          )}
 
           {/* Causa */}
           <div className="card p-5 space-y-4">
@@ -252,7 +231,7 @@ export default function MortalidadDetalle() {
             loading={loadingAudit}
             formatCambios={formatearCambios}
             emptyMessage={
-              dentroDeVentana
+              dentroDeVentana || isAdmin
                 ? 'Cualquier edición que realices aparecerá aquí.'
                 : 'Este registro no fue editado dentro de su ventana de 24 h.'
             }
@@ -289,6 +268,39 @@ export default function MortalidadDetalle() {
               </div>
             )}
           </div>
+
+          {/* Estado de edición */}
+          {isAdmin ? (
+            <div className="card p-4 flex items-start gap-3 bg-blue-50/60 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/50">
+              <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/40 rounded-lg flex items-center justify-center flex-shrink-0">
+                <ShieldCheck className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-blue-800 dark:text-blue-300">Acceso administrador</p>
+                <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">Puedes editar este registro en cualquier momento.</p>
+              </div>
+            </div>
+          ) : dentroDeVentana ? (
+            <div className="card p-4 flex items-start gap-3 bg-amber-50/60 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
+              <div className="w-8 h-8 bg-amber-100 dark:bg-amber-900/40 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">Ventana de edición activa</p>
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">Tiempo restante: <strong>{horasRestantes}h {minsRestantes}min</strong></p>
+              </div>
+            </div>
+          ) : (
+            <div className="card p-4 flex items-start gap-3">
+              <div className="w-8 h-8 bg-stone-100 dark:bg-stone-800 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Lock className="h-4 w-4 text-stone-400 dark:text-stone-500" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-stone-600 dark:text-stone-400">Registro bloqueado</p>
+                <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">La ventana de 24 h ha finalizado.</p>
+              </div>
+            </div>
+          )}
 
           {/* Ubicación */}
           <SideCard title="Ubicación" icon={Building2} gradient="from-red-400 to-red-600">

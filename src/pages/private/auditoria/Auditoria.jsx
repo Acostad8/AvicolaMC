@@ -77,7 +77,7 @@ function avatarBg(name) {
   return AVATAR_PALETTE[h % AVATAR_PALETTE.length]
 }
 
-const SKIP_DIFF_KEYS = new Set(['id', 'created_at', 'updated_at', 'editado_at'])
+const SKIP_DIFF_KEYS = new Set(['id', 'created_at', 'updated_at', 'editado_at', 'ultimo_acceso', 'avatar_url'])
 
 // ── Subcomponentes ────────────────────────────────────────────────
 

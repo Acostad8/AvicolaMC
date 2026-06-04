@@ -5,13 +5,19 @@ import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../context/AuthContext'
 import { useA11y } from '../../../context/AccessibilityContext'
 import { formatDate, downloadCSV, getLabelFromValue, TIPOS_TRATAMIENTO } from '../../../lib/utils'
-import { Plus, Download, Eye, Pencil, Syringe, CheckCircle2, Activity, Layers } from 'lucide-react'
+import { Plus, Download, Eye, Pencil, Syringe, CheckCircle2, Activity, Layers, Lock, Clock } from 'lucide-react'
 import Button from '../../../components/ui/Button'
 import { StatusBadge } from '../../../components/ui/Badge'
 import PageHeader from '../../../components/ui/PageHeader'
 import Pagination from '../../../components/ui/Pagination'
 import EmptyState from '../../../components/ui/EmptyState'
 import { TableSkeleton, Skeleton } from '../../../components/ui/Skeleton'
+
+/* ── 24h edit window check ── */
+function withinEditWindow(created_at) {
+  if (!created_at) return false
+  return Date.now() - new Date(created_at).getTime() < 24 * 3600 * 1000
+}
 
 /* ── KPI Card ── */
 function KpiCard({ icon: Icon, gradient, label, value, sub, loading }) {
@@ -271,14 +277,35 @@ export default function TratamientosList() {
                       <StatusBadge status={r.estado} />
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex gap-1">
+                      <div className="flex items-center gap-1.5">
                         <Link to={`/dashboard/tratamientos/${r.id}`}>
                           <Button variant="ghost" size="sm" icon={Eye}>Ver</Button>
                         </Link>
-                        {isAdmin && (
+                        {isAdmin ? (
                           <Link to={`/dashboard/tratamientos/${r.id}/editar`}>
-                            <Button variant="ghost" size="sm" icon={Pencil}>Editar</Button>
+                            <Button variant="ghost" size="sm" icon={Pencil}
+                              className="text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                            >
+                              Editar
+                            </Button>
                           </Link>
+                        ) : withinEditWindow(r.created_at) ? (
+                          <Link to={`/dashboard/tratamientos/${r.id}/editar`}>
+                            <Button variant="ghost" size="sm" icon={Clock}
+                              className="text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                              title="Editar — ventana de 24 h activa"
+                            >
+                              Editar
+                            </Button>
+                          </Link>
+                        ) : (
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-stone-400 dark:text-stone-500 bg-stone-100 dark:bg-stone-800 cursor-not-allowed select-none"
+                            title="El período de edición de 24 horas ha finalizado"
+                          >
+                            <Lock className="h-3 w-3" />
+                            Bloqueado
+                          </span>
                         )}
                       </div>
                     </td>

@@ -83,6 +83,12 @@ html.reduce-motion *::after {
   animation-iteration-count: 1 !important;
   transition-duration: 0.01ms !important;
 }
+/* El toggle del panel de accesibilidad siempre anima para dar feedback visual claro */
+html.reduce-motion .a11y-toggle-switch,
+html.reduce-motion .a11y-toggle-switch * {
+  animation-duration: 200ms !important;
+  transition-duration: 200ms !important;
+}
 
 /* ── Grid dot pattern ── */
 .bg-grid-pattern {
