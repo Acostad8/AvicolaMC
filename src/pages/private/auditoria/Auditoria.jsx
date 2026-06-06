@@ -20,6 +20,8 @@ const MODULOS = {
   movimientos_insumos: 'Movimientos',
   tratamientos:        'Tratamientos',
   perfiles:            'Usuarios',
+  empleados:           'Empleados',
+  proveedores:         'Proveedores',
   galpones:            'Galpones',
   lotes:               'Lotes',
   sesion:              'Sesión',

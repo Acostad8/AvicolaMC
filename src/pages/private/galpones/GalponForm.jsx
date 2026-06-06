@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -9,18 +9,28 @@ import Input from '../../../components/ui/Input'
 import Select from '../../../components/ui/Select'
 import Textarea from '../../../components/ui/Textarea'
 import Button from '../../../components/ui/Button'
+import Modal from '../../../components/ui/Modal'
 import PageHeader from '../../../components/ui/PageHeader'
 import toast from 'react-hot-toast'
-import { Building2, Users, FileText, Settings2, CheckCircle2, XCircle, AlertCircle } from 'lucide-react'
+import {
+  Building2, Users, FileText, Settings2,
+  CheckCircle2, AlertCircle, AlertTriangle, Activity, Wrench, Lock,
+} from 'lucide-react'
 import { Skeleton } from '../../../components/ui/Skeleton'
 
 const schema = z.object({
   nombre:           z.string().min(1, 'El nombre es requerido'),
   capacidad_maxima: z.coerce.number().int().positive('Debe ser un número positivo'),
   descripcion:      z.string().optional(),
-  estado:           z.enum(['activo', 'inactivo']),
+  estado:           z.enum(['disponible', 'en_produccion', 'en_mantenimiento']),
   encargado_id:     z.string().optional(),
 })
+
+const ESTADO_CONFIG = {
+  disponible:       { icon: CheckCircle2,  label: 'Disponible',        color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-900/50' },
+  en_produccion:    { icon: Activity,      label: 'En producción',     color: 'text-amber-600 dark:text-amber-400',     bg: 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-900/50'   },
+  en_mantenimiento: { icon: Wrench,        label: 'En mantenimiento',  color: 'text-blue-600 dark:text-blue-400',       bg: 'bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-900/50'       },
+}
 
 function FormSection({ icon: Icon, title, gradient, children }) {
   return (
@@ -37,15 +47,11 @@ function FormSection({ icon: Icon, title, gradient, children }) {
 }
 
 function PreviewCard({ nombre, capacidad, descripcion, estado, encargadoNombre, isEdit }) {
-  const estadoConfig = estado === 'activo'
-    ? { icon: CheckCircle2, label: 'Activo', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-900/50' }
-    : { icon: XCircle,      label: 'Inactivo', color: 'text-red-500 dark:text-red-400',       bg: 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-900/50' }
-
-  const EstadoIcon = estadoConfig.icon
+  const cfg = ESTADO_CONFIG[estado] ?? ESTADO_CONFIG.disponible
+  const EstadoIcon = cfg.icon
 
   return (
     <div className="card p-5 space-y-5 h-fit">
-      {/* Preview header */}
       <div className="flex items-center gap-2 pb-3 border-b border-stone-100 dark:border-stone-800">
         <div className="w-7 h-7 bg-gradient-to-br from-violet-400 to-violet-600 rounded-lg flex items-center justify-center flex-shrink-0">
           <Building2 className="h-3.5 w-3.5 text-white" />
@@ -53,15 +59,14 @@ function PreviewCard({ nombre, capacidad, descripcion, estado, encargadoNombre, 
         <h2 className="text-sm font-semibold text-stone-700 dark:text-stone-300">Vista previa</h2>
       </div>
 
-      {/* Galpon card preview */}
-      <div className={`rounded-xl border-2 p-4 space-y-3 transition-all duration-300 ${isEdit ? 'border-primary-300 dark:border-primary-700  dark:bg-primary-950/20' : 'border-amber-300 dark:border-amber-700 bg-amber-50/40 dark:bg-amber-950/20'}`}>
+      <div className={`rounded-xl border-2 p-4 space-y-3 transition-all duration-300 ${isEdit ? 'border-primary-300 dark:border-primary-700 dark:bg-primary-950/20' : 'border-amber-300 dark:border-amber-700 bg-amber-50/40 dark:bg-amber-950/20'}`}>
         <div className="flex items-start justify-between gap-2">
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0 ${isEdit ? 'bg-gradient-to-br from-primary-500 to-primary-700' : 'bg-gradient-to-br from-amber-400 to-amber-600'}`}>
             <Building2 className="h-5 w-5 text-white" />
           </div>
-          <span className={`text-xs font-medium px-2 py-1 rounded-full border ${estadoConfig.bg} ${estadoConfig.color} flex items-center gap-1`}>
+          <span className={`text-xs font-medium px-2 py-1 rounded-full border ${cfg.bg} ${cfg.color} flex items-center gap-1`}>
             <EstadoIcon className="h-3 w-3" />
-            {estadoConfig.label}
+            {cfg.label}
           </span>
         </div>
 
@@ -92,14 +97,13 @@ function PreviewCard({ nombre, capacidad, descripcion, estado, encargadoNombre, 
         </div>
       </div>
 
-      {/* Tips */}
       <div className="space-y-2">
         <p className="text-xs font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wide">Sugerencias</p>
         <div className="space-y-2">
           {[
-            { ok: nombre?.length > 0,    text: 'Nombre del galpón ingresado' },
-            { ok: capacidad > 0,          text: 'Capacidad máxima definida' },
-            { ok: !!encargadoNombre,      text: 'Encargado asignado' },
+            { ok: nombre?.length > 0,     text: 'Nombre del galpón ingresado' },
+            { ok: capacidad > 0,           text: 'Capacidad máxima definida' },
+            { ok: !!encargadoNombre,       text: 'Encargado asignado' },
             { ok: descripcion?.length > 0, text: 'Descripción agregada' },
           ].map(({ ok, text }) => (
             <div key={text} className="flex items-center gap-2">
@@ -126,14 +130,32 @@ export default function GalponForm() {
 
   const { register, handleSubmit, reset, watch, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
-    defaultValues: { estado: 'activo', encargado_id: '' },
+    defaultValues: { estado: 'disponible', encargado_id: '' },
   })
 
-  const capacidad     = watch('capacidad_maxima')
-  const nombre        = watch('nombre')
-  const descripcion   = watch('descripcion')
-  const estado        = watch('estado')
-  const encargadoId   = watch('encargado_id')
+  const capacidad   = watch('capacidad_maxima')
+  const nombre      = watch('nombre')
+  const descripcion = watch('descripcion')
+  const estado      = watch('estado')
+  const encargadoId = watch('encargado_id')
+
+  const [nombreDebounced, setNombreDebounced] = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => setNombreDebounced(nombre?.trim() || ''), 400)
+    return () => clearTimeout(t)
+  }, [nombre])
+
+  const { data: nombreDuplicado } = useQuery({
+    queryKey: ['galpon-nombre-check', nombreDebounced, id],
+    queryFn: async () => {
+      let q = supabase.from('galpones').select('id', { count: 'exact', head: true })
+        .ilike('nombre', nombreDebounced)
+      if (id) q = q.neq('id', id)
+      const { count } = await q
+      return (count || 0) > 0
+    },
+    enabled: nombreDebounced.length > 0,
+  })
 
   const { data: encargados } = useQuery({
     queryKey: ['encargados-list'],
@@ -153,6 +175,19 @@ export default function GalponForm() {
     enabled: isEdit,
   })
 
+  const { data: tieneLoteActivo } = useQuery({
+    queryKey: ['galpon-lote-activo', id],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from('lotes')
+        .select('id', { count: 'exact', head: true })
+        .eq('galpon_id', id)
+        .eq('estado', 'activo')
+      return (count || 0) > 0
+    },
+    enabled: isEdit,
+  })
+
   useEffect(() => {
     if (galpon) reset({
       nombre:           galpon.nombre,
@@ -166,6 +201,8 @@ export default function GalponForm() {
   const mutation = useMutation({
     mutationFn: async (values) => {
       const payload = { ...values, encargado_id: values.encargado_id || null }
+      // El estado en_produccion lo gestiona el trigger; no se actualiza manualmente
+      if (tieneLoteActivo) delete payload.estado
       if (isEdit) {
         const { error } = await supabase.from('galpones').update(payload).eq('id', id)
         if (error) throw error
@@ -181,6 +218,9 @@ export default function GalponForm() {
     },
     onError: e => toast.error(e.message || 'Error al guardar'),
   })
+
+  const [confirmOpen, setConfirmOpen]     = useState(false)
+  const [pendingValues, setPendingValues] = useState(null)
 
   const encargadoNombre = encargados?.find(e => e.id === encargadoId)?.nombre_completo || ''
 
@@ -211,12 +251,13 @@ export default function GalponForm() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
-        {/* ── Left / main form ── */}
         <form
-          onSubmit={handleSubmit(v => mutation.mutate(v))}
+          onSubmit={handleSubmit(v => {
+            if (isEdit) { setPendingValues(v); setConfirmOpen(true) }
+            else mutation.mutate(v)
+          })}
           className="lg:col-span-2 card p-6 space-y-7"
         >
-          {/* Form header */}
           <div className="flex items-center gap-3 pb-4 border-b border-stone-100 dark:border-stone-800">
             <div className={`w-11 h-11 rounded-xl flex items-center justify-center shadow-sm ${isEdit ? 'bg-gradient-to-br from-primary-500 to-primary-700' : 'bg-gradient-to-br from-amber-400 to-amber-600'}`}>
               <Building2 className="h-5 w-5 text-white" aria-hidden="true" />
@@ -231,14 +272,14 @@ export default function GalponForm() {
             </div>
           </div>
 
-          {/* Basic info */}
+          {/* Información básica */}
           <FormSection icon={FileText} title="Información básica" gradient="from-amber-400 to-amber-600">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="sm:col-span-2">
                 <Input
                   label="Nombre del galpón"
                   placeholder="Ej: Galpón A, Galpón Norte…"
-                  error={errors.nombre?.message}
+                  error={errors.nombre?.message || (nombreDuplicado ? 'Ya existe un galpón con este nombre' : undefined)}
                   {...register('nombre')}
                 />
               </div>
@@ -268,18 +309,35 @@ export default function GalponForm() {
             </div>
           </FormSection>
 
-          {/* Config + Assignment in a 2-col grid */}
+          {/* Configuración + Encargado */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-7">
             <FormSection icon={Settings2} title="Configuración" gradient="from-blue-400 to-blue-600">
-              <Select
-                label="Estado del galpón"
-                options={[
-                  { value: 'activo',   label: 'Activo — disponible para producción' },
-                  { value: 'inactivo', label: 'Inactivo — fuera de operación' },
-                ]}
-                error={errors.estado?.message}
-                {...register('estado')}
-              />
+              {tieneLoteActivo ? (
+                /* Estado bloqueado: gestionado por el sistema mientras hay lote activo */
+                <div className="space-y-2">
+                  <label className="label flex items-center gap-1.5">
+                    Estado del galpón
+                    <Lock className="h-3 w-3 text-stone-400 dark:text-stone-500" aria-hidden="true" />
+                  </label>
+                  <div className="input-base bg-stone-50 dark:bg-stone-800/40 text-stone-500 dark:text-stone-400 cursor-not-allowed pointer-events-none select-none flex items-center gap-2">
+                    <Activity className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                    En producción
+                  </div>
+                  <p className="text-xs text-stone-400 dark:text-stone-500">
+                    Cambia automáticamente al finalizar el lote activo.
+                  </p>
+                </div>
+              ) : (
+                <Select
+                  label="Estado del galpón"
+                  options={[
+                    { value: 'disponible',       label: 'Disponible — listo para un lote' },
+                    { value: 'en_mantenimiento', label: 'En mantenimiento — limpieza o reparación' },
+                  ]}
+                  error={errors.estado?.message}
+                  {...register('estado')}
+                />
+              )}
             </FormSection>
 
             <FormSection icon={Users} title="Encargado" gradient="from-green-400 to-green-600">
@@ -300,9 +358,18 @@ export default function GalponForm() {
             </FormSection>
           </div>
 
-          {/* Actions */}
+          {/* Nota informativa cuando está en mantenimiento */}
+          {!tieneLoteActivo && estado === 'en_mantenimiento' && (
+            <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl">
+              <AlertTriangle className="h-4 w-4 text-blue-500 dark:text-blue-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
+              <p className="text-xs text-blue-700 dark:text-blue-300">
+                Los galpones en mantenimiento no aparecen disponibles para asignar nuevos lotes.
+              </p>
+            </div>
+          )}
+
           <div className="flex gap-3 pt-2 border-t border-stone-100 dark:border-stone-800">
-            <Button type="submit" loading={mutation.isPending || isSubmitting}>
+            <Button type="submit" loading={mutation.isPending || isSubmitting} disabled={!!nombreDuplicado}>
               {isEdit ? 'Guardar cambios' : 'Crear galpón'}
             </Button>
             <Button type="button" variant="secondary" onClick={() => navigate('/dashboard/galpones')}>
@@ -311,7 +378,6 @@ export default function GalponForm() {
           </div>
         </form>
 
-        {/* ── Right / preview ── */}
         <PreviewCard
           nombre={nombre}
           capacidad={capacidad}
@@ -321,6 +387,85 @@ export default function GalponForm() {
           isEdit={isEdit}
         />
       </div>
+
+      {/* ── Modal de confirmación (solo edición) ── */}
+      <Modal
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title="Confirmar cambios"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setConfirmOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={() => { setConfirmOpen(false); mutation.mutate(pendingValues) }}
+              loading={mutation.isPending}
+            >
+              Confirmar cambios
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-stone-600 dark:text-stone-400">Revisa los cambios antes de guardar:</p>
+          <div className="space-y-2">
+            {[
+              {
+                label:  'Nombre',
+                oldVal: galpon?.nombre || '',
+                newVal: pendingValues?.nombre || '',
+                format: v => v || '—',
+              },
+              {
+                label:  'Capacidad máxima',
+                oldVal: galpon?.capacidad_maxima,
+                newVal: pendingValues ? Number(pendingValues.capacidad_maxima) : null,
+                format: v => v != null ? `${Number(v).toLocaleString('es-CO')} aves` : '—',
+              },
+              {
+                label:  'Descripción',
+                oldVal: galpon?.descripcion || '',
+                newVal: pendingValues?.descripcion || '',
+                format: v => v || '—',
+              },
+              ...(!tieneLoteActivo ? [{
+                label:  'Estado',
+                oldVal: galpon?.estado || '',
+                newVal: pendingValues?.estado || '',
+                format: v => ESTADO_CONFIG[v]?.label || v || '—',
+              }] : []),
+              {
+                label:  'Encargado',
+                oldVal: galpon?.encargado_id || '',
+                newVal: pendingValues?.encargado_id || '',
+                format: v => encargados?.find(e => e.id === v)?.nombre_completo || (!v ? 'Sin asignar' : v),
+              },
+            ].map(({ label, oldVal, newVal, format }) => {
+              const changed = String(oldVal ?? '') !== String(newVal ?? '')
+              return (
+                <div
+                  key={label}
+                  className={`rounded-xl border px-4 py-3 ${
+                    changed
+                      ? 'border-amber-200 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-950/20'
+                      : 'border-stone-100 dark:border-stone-800 bg-stone-50/60 dark:bg-stone-800/30'
+                  }`}
+                >
+                  <p className="text-xs font-medium text-stone-500 dark:text-stone-400 mb-1">{label}</p>
+                  {changed ? (
+                    <div className="flex items-center gap-2 text-sm flex-wrap">
+                      <span className="line-through text-stone-400 dark:text-stone-500">{format(oldVal)}</span>
+                      <span className="text-stone-400">→</span>
+                      <span className="font-semibold text-stone-800 dark:text-stone-100">{format(newVal)}</span>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-stone-600 dark:text-stone-300">{format(oldVal)}</p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

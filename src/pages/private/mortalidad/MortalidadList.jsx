@@ -74,7 +74,7 @@ export default function MortalidadList() {
   const { data: galpones } = useQuery({
     queryKey: ['galpones-select', isAdmin, perfil?.id],
     queryFn: async () => {
-      let q = supabase.from('galpones').select('id, nombre').eq('estado', 'activo').order('nombre')
+      let q = supabase.from('galpones').select('id, nombre').in('estado', ['en_produccion', 'disponible']).order('nombre')
       if (!isAdmin) q = q.eq('encargado_id', perfil.id)
       const { data } = await q
       return data || []

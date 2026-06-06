@@ -76,16 +76,21 @@ export default function MortalidadDetalle() {
   const { data: auditoria, isLoading: loadingAudit } = useQuery({
     queryKey: ['auditoria-mortalidad', id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('auditoria_mortalidad')
-        .select('*, editado:perfiles(nombre_completo)')
-        .eq('mortalidad_id', id)
-        .order('editado_at', { ascending: false })
-      if (error) throw error
-      return data || []
+      const { data } = await supabase
+        .from('auditoria')
+        .select('id, usuario_nombre, datos_anteriores, datos_nuevos, created_at')
+        .eq('tabla', 'mortalidad')
+        .eq('registro_id', id)
+        .eq('operacion', 'UPDATE')
+        .order('created_at', { ascending: false })
+        .limit(30)
+      return (data || []).map(e => ({
+        ...e,
+        editado:    { nombre_completo: e.usuario_nombre },
+        editado_at: e.created_at,
+      }))
     },
     enabled: !!id,
-    retry: 1,
   })
 
   if (isLoading) return (

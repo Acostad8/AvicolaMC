@@ -11,6 +11,7 @@ import { StatusBadge } from '../../../components/ui/Badge'
 import Button from '../../../components/ui/Button'
 import { ConfirmModal } from '../../../components/ui/Modal'
 import { Skeleton } from '../../../components/ui/Skeleton'
+import AuditHistorial from '../../../components/ui/AuditHistorial'
 import toast from 'react-hot-toast'
 import {
   CheckCircle, PauseCircle, Layers, Bird, Building2,
@@ -151,6 +152,34 @@ function StatCard({ label, value, icon: Icon, color, gradient, delay, noMotion }
   )
 }
 
+/* ── Historial de cambios ── */
+function formatearCambios(ant, nue) {
+  if (!ant || !nue) return []
+  const ESTADO_LABELS = { activo: 'Activo', finalizado: 'Finalizado', suspendido: 'Suspendido' }
+  const campos = [
+    { key: 'nombre_numero',         label: 'Nombre' },
+    { key: 'estado',                label: 'Estado' },
+    { key: 'fecha_ingreso',         label: 'Fecha de ingreso' },
+    { key: 'fecha_salida',          label: 'Fecha de salida' },
+    { key: 'cantidad_inicial_aves', label: 'Aves iniciales' },
+    { key: 'raza_id',               label: 'Raza' },
+    { key: 'galpon_id',             label: 'Galpón' },
+    { key: 'notas',                 label: 'Notas' },
+  ]
+  return campos.reduce((acc, c) => {
+    const a = ant[c.key]; const n = nue[c.key]
+    if (String(a ?? '') !== String(n ?? '')) {
+      let va = a ?? '—'; let vn = n ?? '—'
+      if (c.key === 'estado') { va = ESTADO_LABELS[a] || a || '—'; vn = ESTADO_LABELS[n] || n || '—' }
+      if (c.key === 'raza_id' || c.key === 'galpon_id') { va = a ? 'Asignado' : '—'; vn = n ? 'Asignado' : '—' }
+      if (c.key === 'cantidad_inicial_aves') { va = a != null ? Number(a).toLocaleString('es-CO') : '—'; vn = n != null ? Number(n).toLocaleString('es-CO') : '—' }
+      if (c.key === 'fecha_ingreso' || c.key === 'fecha_salida') { va = a ? formatDate(a) : '—'; vn = n ? formatDate(n) : '—' }
+      acc.push({ campo: c.label, anterior: va, nuevo: vn })
+    }
+    return acc
+  }, [])
+}
+
 /* ── Detail item ── */
 function Detail({ label, value, accent }) {
   return (
@@ -176,6 +205,25 @@ export default function LoteDetalle() {
         .select(`*, galpon:galpones(nombre, capacidad_maxima), raza:razas(nombre, tipo)`)
         .eq('id', id).single()
       return data
+    },
+  })
+
+  const { data: historial, isLoading: historialLoading } = useQuery({
+    queryKey: ['lote-historial', id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('auditoria')
+        .select('id, usuario_nombre, datos_anteriores, datos_nuevos, created_at')
+        .eq('tabla', 'lotes')
+        .eq('registro_id', id)
+        .eq('operacion', 'UPDATE')
+        .order('created_at', { ascending: false })
+        .limit(30)
+      return (data || []).map(e => ({
+        ...e,
+        editado:    { nombre_completo: e.usuario_nombre },
+        editado_at: e.created_at,
+      }))
     },
   })
 
@@ -363,6 +411,19 @@ export default function LoteDetalle() {
                 <p className="text-sm text-stone-600 dark:text-stone-400 leading-relaxed whitespace-pre-wrap">{lote.notas}</p>
               </div>
             )}
+          </div>
+
+          {/* Historial de cambios */}
+          <div
+            className="card p-5"
+            style={noMotion ? undefined : { animation: 'fadeInUp 0.5s ease-out 280ms both' }}
+          >
+            <AuditHistorial
+              entries={historial}
+              loading={historialLoading}
+              formatCambios={formatearCambios}
+              emptyMessage="Este lote no ha sido editado desde su creación."
+            />
           </div>
         </div>
 

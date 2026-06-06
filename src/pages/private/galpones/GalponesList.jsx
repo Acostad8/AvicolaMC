@@ -6,7 +6,7 @@ import { useAuth } from '../../../context/AuthContext'
 import { formatNumber } from '../../../lib/utils'
 import {
   Plus, Eye, Pencil, Search, Building2, Users,
-  LayoutGrid, List, X, TrendingUp, Activity,
+  LayoutGrid, List, X, TrendingUp, Activity, AlertTriangle, Layers, Wrench, CheckCircle2,
 } from 'lucide-react'
 import Button from '../../../components/ui/Button'
 import Badge, { StatusBadge } from '../../../components/ui/Badge'
@@ -14,7 +14,7 @@ import PageHeader from '../../../components/ui/PageHeader'
 import Pagination from '../../../components/ui/Pagination'
 import EmptyState from '../../../components/ui/EmptyState'
 import { TableSkeleton, Skeleton } from '../../../components/ui/Skeleton'
-import { ConfirmModal } from '../../../components/ui/Modal'
+import Modal, { ConfirmModal } from '../../../components/ui/Modal'
 import toast from 'react-hot-toast'
 
 /* ── Occupancy bar ── */
@@ -69,23 +69,38 @@ function KpiCard({ icon: Icon, gradient, label, value, sub, loading }) {
   )
 }
 
+/* ── Color strip por estado ── */
+const STRIP_CLASS = {
+  en_produccion:    'bg-gradient-to-r from-amber-400 to-primary-500',
+  disponible:       'bg-gradient-to-r from-emerald-400 to-emerald-600',
+  en_mantenimiento: 'bg-gradient-to-r from-blue-400 to-blue-600',
+}
+
+const ICON_GRADIENT = {
+  en_produccion:    'from-amber-400 to-amber-600',
+  disponible:       'from-emerald-400 to-emerald-600',
+  en_mantenimiento: 'from-blue-400 to-blue-600',
+}
+
 /* ── Galpon card (grid view) ── */
 function GalponCard({ galpon, isAdmin, onToggle }) {
-  const loteActivo  = galpon.lotes?.find(l => l.estado === 'activo')
+  const loteActivo   = galpon.lotes?.find(l => l.estado === 'activo')
   const avesActuales = loteActivo?.cantidad_aves_actuales || 0
-  const isActivo    = galpon.estado === 'activo'
+  const enProduccion = galpon.estado === 'en_produccion'
+  const disponible   = galpon.estado === 'disponible'
+
+  const stripClass   = STRIP_CLASS[galpon.estado]   || 'bg-stone-200 dark:bg-stone-700'
+  const iconGradient = ICON_GRADIENT[galpon.estado]  || 'from-stone-400 to-stone-600'
 
   return (
     <article className="card flex flex-col gap-0 overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 group">
-      {/* Color strip */}
-      <div className={`h-1.5 w-full ${isActivo ? 'bg-gradient-to-r from-amber-400 to-primary-500' : 'bg-stone-200 dark:bg-stone-700'}`} />
+      <div className={`h-1.5 w-full ${stripClass}`} />
 
       <div className="p-5 flex flex-col gap-4 flex-1">
-        {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-3 min-w-0">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isActivo ? 'bg-gradient-to-br from-amber-400 to-amber-600 shadow-sm shadow-amber-500/30' : 'bg-stone-100 dark:bg-stone-800'}`}>
-              <Building2 className={`h-5 w-5 ${isActivo ? 'text-white' : 'text-stone-400 dark:text-stone-500'}`} aria-hidden="true" />
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br ${iconGradient} shadow-sm`}>
+              <Building2 className="h-5 w-5 text-white" aria-hidden="true" />
             </div>
             <div className="min-w-0">
               <h3 className="font-bold text-stone-900 dark:text-stone-50 truncate">{galpon.nombre}</h3>
@@ -97,10 +112,8 @@ function GalponCard({ galpon, isAdmin, onToggle }) {
           <StatusBadge status={galpon.estado} />
         </div>
 
-        {/* Occupancy */}
         <OccupancyBar current={avesActuales} max={galpon.capacidad_maxima} showLabel />
 
-        {/* Details */}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <p className="detail-label">Lote activo</p>
@@ -125,16 +138,15 @@ function GalponCard({ galpon, isAdmin, onToggle }) {
           </div>
           <div className="col-span-2">
             <p className="detail-label">Encargado</p>
-            <p className="detail-value text-sm flex items-center gap-1.5">
+            <div className="detail-value text-sm flex items-center gap-1.5">
               {galpon.encargado?.nombre_completo
                 ? <><div className="w-5 h-5 rounded-full bg-primary-600 flex items-center justify-center flex-shrink-0"><span className="text-white text-[9px] font-bold">{galpon.encargado.nombre_completo[0]}</span></div>{galpon.encargado.nombre_completo}</>
                 : <span className="text-stone-400 dark:text-stone-600 font-normal text-xs">Sin asignar</span>
               }
-            </p>
+            </div>
           </div>
         </div>
 
-        {/* Actions */}
         <div className="flex items-center gap-1.5 pt-3 border-t border-stone-100 dark:border-stone-800 mt-auto">
           <Link to={`/dashboard/galpones/${galpon.id}`} className="flex-1">
             <Button variant="" size="sm" icon={Eye} className="w-full justify-center text-xs border border-primary-500 dark:border-primary-400 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/25 active:bg-primary-100 dark:active:bg-primary-900/30">
@@ -149,16 +161,19 @@ function GalponCard({ galpon, isAdmin, onToggle }) {
                   className="border border-blue-400 dark:border-blue-500 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/25"
                 />
               </Link>
-              <Button
-                variant="" size="sm"
-                onClick={() => onToggle(galpon)}
-                className={isActivo
-                  ? 'border border-red-400 dark:border-red-500 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/25'
-                  : 'border border-green-500 dark:border-green-500 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/25'
-                }
-              >
-                {isActivo ? 'Desactivar' : 'Activar'}
-              </Button>
+              {!enProduccion && (
+                <Button
+                  variant="" size="sm"
+                  onClick={() => onToggle(galpon)}
+                  icon={disponible ? Wrench : CheckCircle2}
+                  className={disponible
+                    ? 'border border-blue-400 dark:border-blue-500 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/25'
+                    : 'border border-emerald-500 dark:border-emerald-500 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/25'
+                  }
+                >
+                  {disponible ? 'Mantenimiento' : 'Disponible'}
+                </Button>
+              )}
             </>
           )}
         </div>
@@ -171,12 +186,13 @@ function GalponCard({ galpon, isAdmin, onToggle }) {
 export default function GalponesList() {
   const { isAdmin, perfil } = useAuth()
   const qc = useQueryClient()
-  const [search, setSearch]           = useState('')
+  const [search, setSearch]             = useState('')
   const [filterEstado, setFilterEstado] = useState('')
-  const [view, setView]               = useState('cards')
-  const [page, setPage]               = useState(1)
-  const [pageSize, setPageSize]       = useState(12)
-  const [confirm, setConfirm]         = useState(null)
+  const [view, setView]                 = useState('cards')
+  const [page, setPage]                 = useState(1)
+  const [pageSize, setPageSize]         = useState(12)
+  const [confirm, setConfirm]           = useState(null)
+  const [blockedGalpon, setBlockedGalpon] = useState(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ['galpones', isAdmin, perfil?.id],
@@ -184,7 +200,7 @@ export default function GalponesList() {
       let q = supabase.from('galpones').select(`
         id, nombre, capacidad_maxima, estado, descripcion,
         encargado:perfiles(id, nombre_completo),
-        lotes(id, estado, cantidad_aves_actuales, raza:razas(nombre))
+        lotes(id, estado, cantidad_aves_actuales, nombre_numero, raza:razas(nombre))
       `).order('nombre')
       if (!isAdmin) q = q.eq('encargado_id', perfil.id)
       const { data, error } = await q
@@ -203,19 +219,30 @@ export default function GalponesList() {
     onError: () => toast.error('Error al actualizar'),
   })
 
+  function handleToggle(galpon) {
+    if (galpon.estado === 'en_produccion') {
+      setBlockedGalpon(galpon)
+    } else {
+      setConfirm(galpon)
+    }
+  }
+
   /* KPIs */
   const kpis = useMemo(() => {
     if (!data?.length) return null
-    const activos = data.filter(g => g.estado === 'activo')
-    const totalAves = activos.reduce((s, g) => {
+    const enProduccion    = data.filter(g => g.estado === 'en_produccion')
+    const disponibles     = data.filter(g => g.estado === 'disponible')
+    const enMantenimiento = data.filter(g => g.estado === 'en_mantenimiento')
+    const totalAves = enProduccion.reduce((s, g) => {
       const l = g.lotes?.find(l => l.estado === 'activo')
       return s + (l?.cantidad_aves_actuales || 0)
     }, 0)
     const totalCap = data.reduce((s, g) => s + (g.capacidad_maxima || 0), 0)
     return {
       total: data.length,
-      activos: activos.length,
-      inactivos: data.length - activos.length,
+      enProduccion: enProduccion.length,
+      disponibles: disponibles.length,
+      enMantenimiento: enMantenimiento.length,
       totalAves,
       totalCap,
       ocupacion: totalCap > 0 ? ((totalAves / totalCap) * 100).toFixed(1) : 0,
@@ -237,6 +264,21 @@ export default function GalponesList() {
 
   function clearSearch() { setSearch(''); setPage(1) }
 
+  /* Texto para el modal de confirmación */
+  const confirmTexts = confirm && (confirm.estado === 'disponible'
+    ? {
+        title: 'Poner en mantenimiento',
+        message: `El galpón "${confirm.nombre}" pasará a estado "En mantenimiento" y no estará disponible para nuevos lotes.`,
+        confirmLabel: 'Poner en mantenimiento',
+        nextEstado: 'en_mantenimiento',
+      }
+    : {
+        title: 'Marcar como disponible',
+        message: `El galpón "${confirm.nombre}" pasará a estado "Disponible" y podrá alojar un nuevo lote.`,
+        confirmLabel: 'Marcar disponible',
+        nextEstado: 'disponible',
+      })
+
   return (
     <div className="space-y-5">
       <PageHeader
@@ -251,15 +293,14 @@ export default function GalponesList() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <KpiCard loading={isLoading} icon={Building2}   gradient="from-amber-400 to-amber-600"   label="Total galpones"   value={kpis?.total     ?? '—'} />
-        <KpiCard loading={isLoading} icon={Activity}    gradient="from-green-400 to-green-600"   label="Activos"          value={kpis?.activos   ?? '—'} sub={kpis ? `${kpis.inactivos} inactivos` : undefined} />
-        <KpiCard loading={isLoading} icon={Users}        gradient="from-blue-400 to-blue-600"     label="Aves en prod."    value={kpis ? formatNumber(kpis.totalAves) : '—'} sub="total activas" />
-        <KpiCard loading={isLoading} icon={TrendingUp}   gradient="from-violet-400 to-violet-600" label="Ocupación prom."  value={kpis ? `${kpis.ocupacion}%` : '—'} sub={kpis ? `de ${formatNumber(kpis.totalCap)} cap.` : undefined} />
+        <KpiCard loading={isLoading} icon={Building2}  gradient="from-amber-400 to-amber-600"   label="Total galpones"   value={kpis?.total          ?? '—'} />
+        <KpiCard loading={isLoading} icon={Activity}   gradient="from-amber-400 to-amber-600"   label="En producción"   value={kpis?.enProduccion   ?? '—'} sub={kpis ? `${kpis.disponibles} disponibles` : undefined} />
+        <KpiCard loading={isLoading} icon={Users}       gradient="from-blue-400 to-blue-600"     label="Aves en prod."   value={kpis ? formatNumber(kpis.totalAves) : '—'} sub="total activas" />
+        <KpiCard loading={isLoading} icon={TrendingUp}  gradient="from-violet-400 to-violet-600" label="Ocupación prom." value={kpis ? `${kpis.ocupacion}%` : '—'} sub={kpis ? `de ${formatNumber(kpis.totalCap)} cap.` : undefined} />
       </div>
 
       {/* Filters + view toggle */}
       <div className="card p-4 flex flex-col sm:flex-row gap-3">
-        {/* Search */}
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400 dark:text-stone-500 pointer-events-none" aria-hidden="true" />
           <input
@@ -276,19 +317,18 @@ export default function GalponesList() {
           )}
         </div>
 
-        {/* Estado filter */}
         <select
-          className="input-base sm:w-44"
+          className="input-base sm:w-52"
           value={filterEstado}
           onChange={e => { setFilterEstado(e.target.value); setPage(1) }}
           aria-label="Filtrar por estado"
         >
           <option value="">Todos los estados</option>
-          <option value="activo">Solo activos</option>
-          <option value="inactivo">Solo inactivos</option>
+          <option value="en_produccion">En producción</option>
+          <option value="disponible">Disponible</option>
+          <option value="en_mantenimiento">En mantenimiento</option>
         </select>
 
-        {/* View toggle */}
         <div className="flex items-center gap-1 bg-stone-100 dark:bg-stone-800 rounded-xl p-1 self-center">
           <button
             onClick={() => setView('cards')}
@@ -307,7 +347,6 @@ export default function GalponesList() {
         </div>
       </div>
 
-      {/* Results label */}
       {!isLoading && (
         <p className="text-xs text-stone-400 dark:text-stone-500 px-1">
           {filtered.length} galpón{filtered.length !== 1 ? 'es' : ''} encontrado{filtered.length !== 1 ? 's' : ''}
@@ -342,7 +381,7 @@ export default function GalponesList() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {paginated.map(g => (
-                <GalponCard key={g.id} galpon={g} isAdmin={isAdmin} onToggle={setConfirm} />
+                <GalponCard key={g.id} galpon={g} isAdmin={isAdmin} onToggle={handleToggle} />
               ))}
             </div>
           )}
@@ -366,14 +405,17 @@ export default function GalponesList() {
                 </thead>
                 <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
                   {paginated.map(g => {
-                    const loteActivo  = g.lotes?.find(l => l.estado === 'activo')
+                    const loteActivo   = g.lotes?.find(l => l.estado === 'activo')
                     const avesActuales = loteActivo?.cantidad_aves_actuales || 0
+                    const enProduccion = g.estado === 'en_produccion'
+                    const disponible   = g.estado === 'disponible'
+                    const iconGradient = ICON_GRADIENT[g.estado] || 'from-stone-400 to-stone-600'
                     return (
                       <tr key={g.id} className="hover:bg-stone-50 dark:hover:bg-stone-800/40 transition-colors">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
-                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${g.estado === 'activo' ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-stone-100 dark:bg-stone-800'}`}>
-                              <Building2 className={`h-3.5 w-3.5 ${g.estado === 'activo' ? 'text-amber-600 dark:text-amber-400' : 'text-stone-400 dark:text-stone-500'}`} />
+                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br ${iconGradient}`}>
+                              <Building2 className="h-3.5 w-3.5 text-white" />
                             </div>
                             <span className="font-semibold text-stone-800 dark:text-stone-100">{g.nombre}</span>
                           </div>
@@ -385,7 +427,7 @@ export default function GalponesList() {
                         <td className="px-4 py-3"><StatusBadge status={g.estado} /></td>
                         <td className="px-4 py-3">
                           {loteActivo
-                            ? <Badge variant="green">{formatNumber(avesActuales)} aves</Badge>
+                            ? <Badge variant="green">{loteActivo.nombre_numero}</Badge>
                             : <span className="text-stone-400 dark:text-stone-600 text-xs">Sin lote</span>
                           }
                         </td>
@@ -407,16 +449,19 @@ export default function GalponesList() {
                                     Editar
                                   </Button>
                                 </Link>
-                                <Button
-                                  variant="" size="sm"
-                                  className={g.estado === 'activo'
-                                    ? 'border border-red-400 dark:border-red-500 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/25'
-                                    : 'border border-green-500 dark:border-green-500 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/25'
-                                  }
-                                  onClick={() => setConfirm(g)}
-                                >
-                                  {g.estado === 'activo' ? 'Desactivar' : 'Activar'}
-                                </Button>
+                                {!enProduccion && (
+                                  <Button
+                                    variant="" size="sm"
+                                    icon={disponible ? Wrench : CheckCircle2}
+                                    className={disponible
+                                      ? 'border border-blue-400 dark:border-blue-500 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/25'
+                                      : 'border border-emerald-500 dark:border-emerald-500 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/25'
+                                    }
+                                    onClick={() => handleToggle(g)}
+                                  >
+                                    {disponible ? 'Mantenimiento' : 'Disponible'}
+                                  </Button>
+                                )}
                               </>
                             )}
                           </div>
@@ -434,22 +479,51 @@ export default function GalponesList() {
         </div>
       )}
 
-      {/* Pagination for cards view */}
       {view === 'cards' && filtered.length > pageSize && (
         <div className="card overflow-hidden">
           <Pagination page={page} totalPages={totalPages} onPageChange={setPage} pageSize={pageSize} onPageSizeChange={n => { setPageSize(n); setPage(1) }} />
         </div>
       )}
 
-      <ConfirmModal
-        open={!!confirm}
-        onClose={() => setConfirm(null)}
-        onConfirm={() => toggleMutation.mutate({ id: confirm.id, estado: confirm.estado === 'activo' ? 'inactivo' : 'activo' })}
-        loading={toggleMutation.isPending}
-        title={confirm?.estado === 'activo' ? 'Desactivar galpón' : 'Activar galpón'}
-        message={`¿Estás seguro de ${confirm?.estado === 'activo' ? 'desactivar' : 'activar'} el galpón "${confirm?.nombre}"?`}
-        confirmLabel={confirm?.estado === 'activo' ? 'Desactivar' : 'Activar'}
-      />
+      {/* Modal bloqueante: galpón en producción */}
+      <Modal
+        open={!!blockedGalpon}
+        onClose={() => setBlockedGalpon(null)}
+        title="No se puede cambiar el estado"
+        footer={<Button onClick={() => setBlockedGalpon(null)}>Entendido</Button>}
+      >
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl">
+            <AlertTriangle className="h-5 w-5 text-amber-500 dark:text-amber-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
+            <div>
+              <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">
+                El galpón "{blockedGalpon?.nombre}" está en producción
+              </p>
+              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                No es posible cambiar el estado mientras tenga un lote activo alojado.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3 p-3 bg-stone-50 dark:bg-stone-800/60 border border-stone-200 dark:border-stone-700 rounded-xl">
+            <Layers className="h-4 w-4 text-stone-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
+            <p className="text-sm text-stone-600 dark:text-stone-400">
+              El estado cambiará automáticamente a "Disponible" cuando finalices el lote activo asociado.
+            </p>
+          </div>
+        </div>
+      </Modal>
+
+      {confirm && confirmTexts && (
+        <ConfirmModal
+          open={!!confirm}
+          onClose={() => setConfirm(null)}
+          onConfirm={() => toggleMutation.mutate({ id: confirm.id, estado: confirmTexts.nextEstado })}
+          loading={toggleMutation.isPending}
+          title={confirmTexts.title}
+          message={confirmTexts.message}
+          confirmLabel={confirmTexts.confirmLabel}
+        />
+      )}
     </div>
   )
 }

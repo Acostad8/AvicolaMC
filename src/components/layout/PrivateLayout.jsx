@@ -2,6 +2,9 @@ import { useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Header from './Header'
+import { useAuth } from '../../context/AuthContext'
+import { useIdleTimeout } from '../../hooks/useIdleTimeout'
+import { IdleWarningModal } from '../ui/IdleWarningModal'
 
 const routeTitles = {
   '/dashboard': 'Dashboard',
@@ -29,8 +32,15 @@ function getTitle(pathname) {
 
 export default function PrivateLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const location = useLocation()
-  const title = getTitle(location.pathname)
+  const location  = useLocation()
+  const title     = getTitle(location.pathname)
+  const { signOut } = useAuth()
+
+  const { isWarning, countdown, warningSeconds, resetTimer } = useIdleTimeout({
+    timeoutMs: 30 * 60 * 1000,
+    warningMs:  2 * 60 * 1000,
+    onTimeout:  signOut,
+  })
 
   return (
     <div className="flex h-screen bg-stone-50 dark:bg-stone-950 overflow-hidden transition-colors duration-300">
@@ -41,6 +51,14 @@ export default function PrivateLayout() {
           <Outlet />
         </main>
       </div>
+
+      <IdleWarningModal
+        open={isWarning}
+        countdown={countdown}
+        warningSeconds={warningSeconds}
+        onStay={resetTimer}
+        onLogout={signOut}
+      />
     </div>
   )
 }

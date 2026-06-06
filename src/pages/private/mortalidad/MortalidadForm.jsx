@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -11,6 +11,7 @@ import Input from '../../../components/ui/Input'
 import Select from '../../../components/ui/Select'
 import Textarea from '../../../components/ui/Textarea'
 import Button from '../../../components/ui/Button'
+import Modal from '../../../components/ui/Modal'
 import PageHeader from '../../../components/ui/PageHeader'
 import toast from 'react-hot-toast'
 import {
@@ -48,8 +49,7 @@ function FormSection({ icon: Icon, title, gradient, children }) {
 
 function PreviewCard({
   fecha, galponNombre, loteNombre, avesActuales, topeDisponible,
-  cantidadBajas, causaLabel, fueraDePlazo,
-  horasRestantes, minutosRestantes, isEdit, hasLote, superaBajas,
+  cantidadBajas, causaLabel, isEdit, hasLote, superaBajas,
 }) {
   const bajas    = Number(cantidadBajas) || 0
   const avesPost = Math.max(0, topeDisponible - bajas)
@@ -138,20 +138,6 @@ function PreviewCard({
           )}
         </div>
 
-        {/* Tiempo restante / acceso admin */}
-        {isEdit && !fueraDePlazo && (
-          horasRestantes > 0 || minutosRestantes > 0
-            ? (
-              <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2.5">
-                <Clock className="h-4 w-4 text-amber-500 flex-shrink-0" />
-                <div>
-                  <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">Ventana de edición</p>
-                  <p className="text-xs text-amber-700 dark:text-amber-400 tabular-nums">{horasRestantes}h {minutosRestantes}min restantes</p>
-                </div>
-              </div>
-            ) : null
-        )}
-
         {/* Checklist */}
         <div className="space-y-2">
           <p className="text-xs font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wide">Estado</p>
@@ -190,6 +176,18 @@ export default function MortalidadForm() {
   const fecha         = watch('fecha')
   const observaciones = watch('observaciones')
 
+  const [confirmOpen, setConfirmOpen]     = useState(false)
+  const [pendingValues, setPendingValues] = useState(null)
+
+  const onSubmit = (values) => {
+    if (isEdit) {
+      setPendingValues(values)
+      setConfirmOpen(true)
+    } else {
+      mutation.mutate(values)
+    }
+  }
+
   /* ── Registro existente (solo edición) ── */
   const { data: registro } = useQuery({
     queryKey: ['mortalidad-detalle', id],
@@ -225,7 +223,7 @@ export default function MortalidadForm() {
   const { data: galpones } = useQuery({
     queryKey: ['galpones-select', isAdmin, perfil?.id],
     queryFn: async () => {
-      let q = supabase.from('galpones').select('id, nombre').eq('estado', 'activo').order('nombre')
+      let q = supabase.from('galpones').select('id, nombre').eq('estado', 'en_produccion').order('nombre')
       if (!isAdmin) q = q.eq('encargado_id', perfil.id)
       const { data } = await q
       return data || []
@@ -335,6 +333,20 @@ export default function MortalidadForm() {
         ]}
       />
 
+      {isEdit && !isAdmin && !fueraDePlazo && registro && (horasRestantes > 0 || minutosRestantes > 0) && (
+        <div className="flex items-center gap-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3">
+          <div className="w-8 h-8 bg-gradient-to-br from-amber-400 to-amber-600 rounded-lg flex items-center justify-center flex-shrink-0">
+            <Clock className="h-4 w-4 text-white" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Ventana de edición</p>
+            <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">
+              {horasRestantes}h {minutosRestantes}min restantes
+            </p>
+          </div>
+        </div>
+      )}
+
       {isEdit && fueraDePlazo && (
         <div className="flex items-start gap-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3 text-sm text-red-700 dark:text-red-400">
           <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
@@ -345,7 +357,7 @@ export default function MortalidadForm() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
         {/* ── Formulario (2/3) ── */}
-        <form onSubmit={handleSubmit(v => mutation.mutate(v))} className="lg:col-span-2 card p-6 space-y-7">
+        <form onSubmit={handleSubmit(onSubmit)} className="lg:col-span-2 card p-6 space-y-7">
 
           {/* Header */}
           <div className="flex items-center gap-3 pb-4 border-b border-stone-100 dark:border-stone-800">
@@ -505,14 +517,86 @@ export default function MortalidadForm() {
           topeDisponible={topeDisponible}
           cantidadBajas={cantidadBajas}
           causaLabel={causaLabel}
-          fueraDePlazo={fueraDePlazo}
-          horasRestantes={horasRestantes}
-          minutosRestantes={minutosRestantes}
           isEdit={isEdit}
           hasLote={isEdit ? true : !!loteActivo}
           superaBajas={superaBajas}
         />
       </div>
+
+      {/* ── Modal de confirmación (solo edición) ── */}
+      <Modal
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title="Confirmar cambios"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setConfirmOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={() => { setConfirmOpen(false); mutation.mutate(pendingValues) }}
+              loading={mutation.isPending}
+            >
+              Confirmar cambios
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-stone-600 dark:text-stone-400">Revisa los cambios antes de guardar:</p>
+          <div className="space-y-2">
+            {[
+              {
+                label: 'Fecha',
+                oldVal: registro?.fecha,
+                newVal: pendingValues?.fecha,
+                format: v => v
+                  ? new Date(v + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })
+                  : '—',
+              },
+              {
+                label: 'Cantidad de bajas',
+                oldVal: registro?.cantidad_bajas,
+                newVal: pendingValues ? Number(pendingValues.cantidad_bajas) : null,
+                format: v => v != null ? Number(v).toLocaleString('es-CO') : '—',
+              },
+              {
+                label: 'Causa',
+                oldVal: registro?.causa,
+                newVal: pendingValues?.causa,
+                format: v => CAUSAS_MORTALIDAD.find(c => c.value === v)?.label || v || '—',
+              },
+              {
+                label: 'Observaciones',
+                oldVal: registro?.observaciones || '',
+                newVal: pendingValues?.observaciones || '',
+                format: v => v || '—',
+              },
+            ].map(({ label, oldVal, newVal, format }) => {
+              const changed = String(oldVal ?? '') !== String(newVal ?? '')
+              return (
+                <div
+                  key={label}
+                  className={`rounded-xl border px-4 py-3 ${
+                    changed
+                      ? 'border-amber-200 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-950/20'
+                      : 'border-stone-100 dark:border-stone-800 bg-stone-50/60 dark:bg-stone-800/30'
+                  }`}
+                >
+                  <p className="text-xs font-medium text-stone-500 dark:text-stone-400 mb-1">{label}</p>
+                  {changed ? (
+                    <div className="flex items-center gap-2 text-sm flex-wrap">
+                      <span className="line-through text-stone-400 dark:text-stone-500">{format(oldVal)}</span>
+                      <span className="text-stone-400">→</span>
+                      <span className="font-semibold text-stone-800 dark:text-stone-100">{format(newVal)}</span>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-stone-600 dark:text-stone-300">{format(oldVal)}</p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

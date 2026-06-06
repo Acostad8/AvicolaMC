@@ -10,6 +10,7 @@ import Input from '../../../components/ui/Input'
 import Select from '../../../components/ui/Select'
 import Textarea from '../../../components/ui/Textarea'
 import Button from '../../../components/ui/Button'
+import Modal from '../../../components/ui/Modal'
 import PageHeader from '../../../components/ui/PageHeader'
 import toast from 'react-hot-toast'
 import {
@@ -20,7 +21,7 @@ import {
 
 const schema = z.object({
   nombre:         z.string().min(1, 'Requerido'),
-  telefono:       z.string().optional(),
+  telefono:       z.string().min(1, 'Requerido'),
   correo:         z.string().email('Correo inválido').optional().or(z.literal('')),
   direccion:      z.string().optional(),
   tipo_proveedor: z.string().min(1, 'Requerido'),
@@ -78,7 +79,7 @@ function PreviewCard({ nombre, tipoLabel, telefono, correo, direccion, estado, s
   const checks = [
     { ok: nombre?.length > 0,         text: 'Nombre del proveedor' },
     { ok: !!tipoLabel,                 text: 'Tipo de proveedor' },
-    { ok: !!telefono || !!correo,      text: 'Contacto (teléfono o correo)' },
+    { ok: !!telefono,                   text: 'Teléfono de contacto' },
     { ok: selectedInsumos.length > 0,  text: 'Insumos asignados' },
   ]
 
@@ -205,6 +206,18 @@ export default function ProveedorForm() {
 
   const tipoLabel = TIPOS_PROVEEDOR.find(t => t.value === tipoProveedor)?.label
 
+  const [confirmOpen, setConfirmOpen]     = useState(false)
+  const [pendingValues, setPendingValues] = useState(null)
+
+  const onSubmit = (values) => {
+    if (isEdit) {
+      setPendingValues(values)
+      setConfirmOpen(true)
+    } else {
+      mutation.mutate(values)
+    }
+  }
+
   const { data: proveedor } = useQuery({
     queryKey: ['proveedor', id],
     queryFn: async () => {
@@ -309,7 +322,7 @@ export default function ProveedorForm() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
         {/* ── Formulario (2/3) ── */}
-        <form onSubmit={handleSubmit(v => mutation.mutate(v))} className="lg:col-span-2 card p-6 space-y-7">
+        <form onSubmit={handleSubmit(onSubmit)} className="lg:col-span-2 card p-6 space-y-7">
 
           {/* Header */}
           <div className="flex items-center gap-3 pb-4 border-b border-stone-100 dark:border-stone-800">
@@ -360,8 +373,9 @@ export default function ProveedorForm() {
           <FormSection icon={Phone} title="Contacto" gradient="from-green-400 to-green-600">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
-                label="Teléfono (opcional)"
+                label="Teléfono"
                 placeholder="+57 300 000 0000"
+                error={errors.telefono?.message}
                 {...register('telefono')}
               />
               <Input
@@ -438,6 +452,100 @@ export default function ProveedorForm() {
           isEdit={isEdit}
         />
       </div>
+
+      {/* ── Modal de confirmación (solo edición) ── */}
+      <Modal
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title="Confirmar cambios"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setConfirmOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={() => { setConfirmOpen(false); mutation.mutate(pendingValues) }}
+              loading={mutation.isPending}
+            >
+              Confirmar cambios
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-stone-600 dark:text-stone-400">Revisa los cambios antes de guardar:</p>
+          <div className="space-y-2">
+            {[
+              {
+                label: 'Nombre',
+                oldVal: proveedor?.nombre || '',
+                newVal: pendingValues?.nombre || '',
+                format: v => v || '—',
+              },
+              {
+                label: 'Teléfono',
+                oldVal: proveedor?.telefono || '',
+                newVal: pendingValues?.telefono || '',
+                format: v => v || '—',
+              },
+              {
+                label: 'Correo electrónico',
+                oldVal: proveedor?.correo || '',
+                newVal: pendingValues?.correo || '',
+                format: v => v || '—',
+              },
+              {
+                label: 'Dirección',
+                oldVal: proveedor?.direccion || '',
+                newVal: pendingValues?.direccion || '',
+                format: v => v || '—',
+              },
+              {
+                label: 'Tipo de proveedor',
+                oldVal: proveedor?.tipo_proveedor || '',
+                newVal: pendingValues?.tipo_proveedor || '',
+                format: v => TIPOS_PROVEEDOR.find(t => t.value === v)?.label || v || '—',
+              },
+              {
+                label: 'Estado',
+                oldVal: proveedor?.estado || '',
+                newVal: pendingValues?.estado || '',
+                format: v => v === 'activo' ? 'Activo' : v === 'inactivo' ? 'Inactivo' : v || '—',
+              },
+              {
+                label: 'Notas',
+                oldVal: proveedor?.notas || '',
+                newVal: pendingValues?.notas || '',
+                format: v => v || '—',
+              },
+            ].map(({ label, oldVal, newVal, format }) => {
+              const changed = String(oldVal ?? '') !== String(newVal ?? '')
+              return (
+                <div
+                  key={label}
+                  className={`rounded-xl border px-4 py-3 ${
+                    changed
+                      ? 'border-amber-200 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-950/20'
+                      : 'border-stone-100 dark:border-stone-800 bg-stone-50/60 dark:bg-stone-800/30'
+                  }`}
+                >
+                  <p className="text-xs font-medium text-stone-500 dark:text-stone-400 mb-1">{label}</p>
+                  {changed ? (
+                    <div className="flex items-center gap-2 text-sm flex-wrap">
+                      <span className="line-through text-stone-400 dark:text-stone-500">{format(oldVal)}</span>
+                      <span className="text-stone-400">→</span>
+                      <span className="font-semibold text-stone-800 dark:text-stone-100">{format(newVal)}</span>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-stone-600 dark:text-stone-300">{format(oldVal)}</p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          <p className="text-xs text-stone-400 dark:text-stone-500">
+            Los insumos y razas vinculados también se actualizarán según la selección actual.
+          </p>
+        </div>
+      </Modal>
     </div>
   )
 }

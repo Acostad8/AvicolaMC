@@ -6,13 +6,13 @@ import { formatDate } from '../../../lib/utils'
 import {
   Plus, Pencil, Eye, UserCog, Search, Shield,
   Users, UserCheck, Crown, Clock, Mail,
-  CheckCircle2, XCircle, Filter,
+  CheckCircle2, XCircle, Filter, LayoutGrid, LayoutList,
 } from 'lucide-react'
 import Button from '../../../components/ui/Button'
 import PageHeader from '../../../components/ui/PageHeader'
 import Pagination from '../../../components/ui/Pagination'
 import EmptyState from '../../../components/ui/EmptyState'
-import { Skeleton } from '../../../components/ui/Skeleton'
+import { Skeleton, TableSkeleton } from '../../../components/ui/Skeleton'
 
 /* ── Paleta visual por rol ── */
 const ROL_META = {
@@ -168,6 +168,7 @@ export default function UsuariosList() {
   const [filterEstado, setFilterEstado] = useState('')
   const [page,         setPage]         = useState(1)
   const [pageSize,     setPageSize]     = useState(12)
+  const [view,         setView]         = useState('grid')
 
   const { data, isLoading } = useQuery({
     queryKey: ['usuarios'],
@@ -251,13 +252,35 @@ export default function UsuariosList() {
             <option value="inactivo">Inactivo</option>
           </select>
         </div>
+
+        {/* Toggle de vista */}
+        <div className="flex gap-1 bg-stone-100 dark:bg-stone-800 rounded-lg p-1 ml-auto">
+          <button
+            onClick={() => { setView('grid'); setPageSize(12) }}
+            className={`p-2 rounded-md transition-colors ${view === 'grid' ? 'bg-white dark:bg-stone-700 shadow-sm text-stone-900 dark:text-stone-50' : 'text-stone-400 hover:text-stone-600 dark:hover:text-stone-300'}`}
+            title="Vista en cuadrícula"
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => { setView('list'); setPageSize(10); setPage(1) }}
+            className={`p-2 rounded-md transition-colors ${view === 'list' ? 'bg-white dark:bg-stone-700 shadow-sm text-stone-900 dark:text-stone-50' : 'text-stone-400 hover:text-stone-600 dark:hover:text-stone-300'}`}
+            title="Vista en lista"
+          >
+            <LayoutList className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
-      {/* ── Grid ── */}
+      {/* ── Contenido ── */}
       {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {[...Array(8)].map((_, i) => <CardSkeleton key={i} />)}
-        </div>
+        view === 'grid'
+          ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {[...Array(8)].map((_, i) => <CardSkeleton key={i} />)}
+            </div>
+          )
+          : <div className="card overflow-hidden"><TableSkeleton rows={6} cols={6} /></div>
       ) : paginated.length === 0 ? (
         <EmptyState
           icon={UserCog}
@@ -267,7 +290,7 @@ export default function UsuariosList() {
             : 'Crea el primer usuario con el botón superior.'
           }
         />
-      ) : (
+      ) : view === 'grid' ? (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {paginated.map(u => <UsuarioCard key={u.id} u={u} />)}
@@ -289,6 +312,99 @@ export default function UsuariosList() {
             />
           </div>
         </>
+      ) : (
+        /* ── Vista lista (tabla) ── */
+        <div className="card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-stone-50 dark:bg-stone-800/50 border-b border-stone-200 dark:border-stone-700">
+                <tr>
+                  {['Usuario', 'Correo', 'Rol', 'Último acceso', 'Estado', 'Acciones'].map(h => (
+                    <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide whitespace-nowrap">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
+                {paginated.map(u => {
+                  const meta      = getRolMeta(u.rol)
+                  const { icon: RolIcon } = meta
+                  const isActivo  = u.estado === 'activo'
+                  return (
+                    <tr key={u.id} className="hover:bg-stone-50 dark:hover:bg-stone-800/40 transition-colors">
+                      {/* Usuario */}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-xl bg-gradient-to-br ${meta.grad} flex items-center justify-center shadow-sm flex-shrink-0`}>
+                            <span className="text-white font-bold text-xs select-none">{getInitials(u.nombre_completo)}</span>
+                          </div>
+                          <p className="font-medium text-stone-800 dark:text-stone-100 leading-tight">{u.nombre_completo}</p>
+                        </div>
+                      </td>
+                      {/* Correo */}
+                      <td className="px-4 py-3 text-stone-600 dark:text-stone-400">
+                        <div className="flex items-center gap-1.5">
+                          <Mail className="h-3.5 w-3.5 text-stone-400 flex-shrink-0" />
+                          <span className="truncate max-w-[200px]">{u.email || '—'}</span>
+                        </div>
+                      </td>
+                      {/* Rol */}
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${meta.badge}`}>
+                          <RolIcon className="h-3 w-3" />
+                          {meta.label}
+                        </span>
+                      </td>
+                      {/* Último acceso */}
+                      <td className="px-4 py-3 text-stone-500 dark:text-stone-400 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="h-3.5 w-3.5 text-stone-400 flex-shrink-0" />
+                          {timeAgoShort(u.ultimo_acceso)}
+                        </div>
+                      </td>
+                      {/* Estado */}
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
+                          isActivo
+                            ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400'
+                            : 'bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400'
+                        }`}>
+                          {isActivo ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                          {isActivo ? 'Activo' : 'Inactivo'}
+                        </span>
+                      </td>
+                      {/* Acciones */}
+                      <td className="px-4 py-3">
+                        <div className="flex gap-1">
+                          <Link to={`/dashboard/usuarios/${u.id}`}>
+                            <Button variant="ghost" size="sm" icon={Eye}>Ver</Button>
+                          </Link>
+                          <Link to={`/dashboard/usuarios/${u.id}/editar`}>
+                            <Button variant="ghost" size="sm" icon={Pencil}>Editar</Button>
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="px-4 py-2.5 border-t border-stone-100 dark:border-stone-800">
+            <p className="text-xs text-stone-400 dark:text-stone-500">
+              Mostrando <strong className="text-stone-600 dark:text-stone-300">{paginated.length}</strong> de <strong className="text-stone-600 dark:text-stone-300">{filtered.length}</strong> usuarios
+            </p>
+          </div>
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            pageSize={pageSize}
+            onPageSizeChange={n => { setPageSize(n); setPage(1) }}
+            pageSizeOptions={[10, 20, 50]}
+          />
+        </div>
       )}
     </div>
   )

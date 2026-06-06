@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -10,12 +10,13 @@ import Input from '../../../components/ui/Input'
 import Select from '../../../components/ui/Select'
 import Textarea from '../../../components/ui/Textarea'
 import Button from '../../../components/ui/Button'
+import Modal from '../../../components/ui/Modal'
 import PageHeader from '../../../components/ui/PageHeader'
 import { Skeleton } from '../../../components/ui/Skeleton'
 import toast from 'react-hot-toast'
 import {
   Layers, Building2, Bird, AlertCircle, CheckCircle2,
-  Info, Lock, CalendarDays, Hash, FileText,
+  Info, Lock, CalendarDays, Hash, FileText, Shuffle,
 } from 'lucide-react'
 import { formatDate, formatNumber } from '../../../lib/utils'
 
@@ -32,6 +33,7 @@ const schemaCrear = z.object({
 
 const schemaEditar = z.object({
   nombre_numero:         z.string().min(1, 'Requerido'),
+  estado:                z.enum(['activo', 'suspendido', 'finalizado']).optional(),
   galpon_id:             z.string().optional(),
   raza_id:               z.string().optional(),
   cantidad_inicial_aves: z.coerce.number().int().positive('Debe ser positivo').optional(),
@@ -252,6 +254,19 @@ export default function LoteForm() {
   const fechaIngreso = watch('fecha_ingreso')
   const razaId       = watch('raza_id')
   const notas        = watch('notas')
+  const estadoActual = watch('estado')
+
+  const [confirmOpen, setConfirmOpen]     = useState(false)
+  const [pendingValues, setPendingValues] = useState(null)
+
+  const onSubmit = (values) => {
+    if (isEdit) {
+      setPendingValues(values)
+      setConfirmOpen(true)
+    } else {
+      mutation.mutate(values)
+    }
+  }
 
   /* ── Cargar datos del lote (solo en edición) ── */
   const { data: lote, isLoading: loteLoading } = useQuery({
@@ -294,6 +309,7 @@ export default function LoteForm() {
     if (lote && isEdit) {
       reset({
         nombre_numero:         lote.nombre_numero,
+        estado:                lote.estado,
         galpon_id:             lote.galpon_id,
         raza_id:               lote.raza_id  ?? '',
         cantidad_inicial_aves: lote.cantidad_inicial_aves,
@@ -307,7 +323,7 @@ export default function LoteForm() {
   const { data: galpones } = useQuery({
     queryKey: ['galpones-select', isAdmin, perfil?.id],
     queryFn: async () => {
-      let q = supabase.from('galpones').select('id, nombre, capacidad_maxima').eq('estado', 'activo').order('nombre')
+      let q = supabase.from('galpones').select('id, nombre, capacidad_maxima').eq('estado', 'disponible').order('nombre')
       if (!isAdmin) q = q.eq('encargado_id', perfil.id)
       const { data } = await q
       return data || []
@@ -357,6 +373,16 @@ export default function LoteForm() {
           nombre_numero: values.nombre_numero,
           raza_id:       values.raza_id || null,
           notas:         values.notas   || null,
+        }
+
+        if (isAdmin && values.estado && values.estado !== lote.estado) {
+          payload.estado = values.estado
+          if (values.estado === 'finalizado' && !lote.fecha_salida) {
+            payload.fecha_salida = new Date().toISOString().slice(0, 10)
+          }
+          if (values.estado === 'activo' && lote.estado === 'finalizado') {
+            payload.fecha_salida = null
+          }
         }
 
         if (!hasRecords) {
@@ -475,7 +501,7 @@ export default function LoteForm() {
 
         {/* ── Formulario principal (2/3) ── */}
         <form
-          onSubmit={handleSubmit(v => mutation.mutate(v))}
+          onSubmit={handleSubmit(onSubmit)}
           className="lg:col-span-2 card p-6 space-y-7"
         >
           {/* Form header */}
@@ -518,6 +544,38 @@ export default function LoteForm() {
               )}
             </div>
           </FormSection>
+
+          {/* ── Estado (solo edición, solo admin) ── */}
+          {isEdit && isAdmin && (
+            <FormSection
+              icon={Shuffle}
+              title="Estado del lote"
+              gradient="from-violet-400 to-violet-600"
+            >
+              <div className="space-y-3">
+                <Select
+                  label="Estado"
+                  options={[
+                    { value: 'activo',      label: 'Activo — en producción normal' },
+                    { value: 'suspendido',  label: 'Suspendido — sin operaciones temporalmente' },
+                    { value: 'finalizado',  label: 'Finalizado — ciclo productivo cerrado' },
+                  ]}
+                  error={errors.estado?.message}
+                  {...register('estado')}
+                />
+                {estadoActual === 'finalizado' && lote?.estado !== 'finalizado' && (
+                  <InfoBox type="warning">
+                    Al finalizar el lote se registrará la fecha de salida de hoy y el galpón quedará disponible para un nuevo lote.
+                  </InfoBox>
+                )}
+                {estadoActual === 'activo' && lote?.estado === 'finalizado' && (
+                  <InfoBox type="warning">
+                    Reactivar un lote finalizado borrará su fecha de salida. Úsalo solo si el cierre fue un error.
+                  </InfoBox>
+                )}
+              </div>
+            </FormSection>
+          )}
 
           {/* ── Galpón y aves ── */}
           <FormSection
@@ -642,6 +700,64 @@ export default function LoteForm() {
           isEdit={isEdit}
         />
       </div>
+
+      {/* ── Modal de confirmación (solo edición) ── */}
+      <Modal
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title="Confirmar cambios"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setConfirmOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={() => { setConfirmOpen(false); mutation.mutate(pendingValues) }}
+              loading={mutation.isPending}
+            >
+              Confirmar cambios
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-stone-600 dark:text-stone-400">Revisa los cambios antes de guardar:</p>
+          <div className="space-y-2">
+            {[
+              { label: 'Nombre / N° de lote', oldVal: lote?.nombre_numero || '', newVal: pendingValues?.nombre_numero || '', format: v => v || '—' },
+              ...(isAdmin ? [{ label: 'Estado', oldVal: lote?.estado || '', newVal: pendingValues?.estado || '', format: v => ({ activo: 'Activo', suspendido: 'Suspendido', finalizado: 'Finalizado' })[v] || v || '—' }] : []),
+              { label: 'Raza', oldVal: lote?.raza_id || '', newVal: pendingValues?.raza_id || '', format: v => (razas || []).find(r => r.id === v)?.nombre || (!v ? '—' : v) },
+              { label: 'Notas', oldVal: lote?.notas || '', newVal: pendingValues?.notas || '', format: v => v || '—' },
+              ...(!hasRecords ? [
+                { label: 'Galpón', oldVal: lote?.galpon_id || '', newVal: pendingValues?.galpon_id || '', format: v => (galpones || []).find(g => g.id === v)?.nombre || (!v ? '—' : v) },
+                { label: 'Cantidad inicial de aves', oldVal: lote?.cantidad_inicial_aves, newVal: pendingValues ? Number(pendingValues.cantidad_inicial_aves) : null, format: v => v != null ? Number(v).toLocaleString('es-CO') : '—' },
+                { label: 'Fecha de ingreso', oldVal: lote?.fecha_ingreso || '', newVal: pendingValues?.fecha_ingreso || '', format: v => v ? formatDate(v) : '—' },
+              ] : []),
+            ].map(({ label, oldVal, newVal, format }) => {
+              const changed = String(oldVal ?? '') !== String(newVal ?? '')
+              return (
+                <div
+                  key={label}
+                  className={`rounded-xl border px-4 py-3 ${
+                    changed
+                      ? 'border-amber-200 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-950/20'
+                      : 'border-stone-100 dark:border-stone-800 bg-stone-50/60 dark:bg-stone-800/30'
+                  }`}
+                >
+                  <p className="text-xs font-medium text-stone-500 dark:text-stone-400 mb-1">{label}</p>
+                  {changed ? (
+                    <div className="flex items-center gap-2 text-sm flex-wrap">
+                      <span className="line-through text-stone-400 dark:text-stone-500">{format(oldVal)}</span>
+                      <span className="text-stone-400">→</span>
+                      <span className="font-semibold text-stone-800 dark:text-stone-100">{format(newVal)}</span>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-stone-600 dark:text-stone-300">{format(oldVal)}</p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

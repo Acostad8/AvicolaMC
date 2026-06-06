@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
+import { useAuth } from '../../../context/AuthContext'
 import { CATEGORIAS_INSUMO, UNIDADES_MEDIDA } from '../../../lib/utils'
 import Input from '../../../components/ui/Input'
 import Select from '../../../components/ui/Select'
@@ -148,6 +149,7 @@ export default function InsumoForm() {
   const isEdit = !!id
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const { perfil } = useAuth()
 
   const { register, handleSubmit, reset, watch, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
@@ -180,8 +182,22 @@ export default function InsumoForm() {
   const mutation = useMutation({
     mutationFn: async (values) => {
       if (isEdit) {
+        const datosAnteriores = {
+          nombre: insumo.nombre, categoria: insumo.categoria,
+          unidad_medida: insumo.unidad_medida, stock_minimo: insumo.stock_minimo,
+          estado: insumo.estado,
+        }
+        const datosNuevos = {
+          nombre: values.nombre, categoria: values.categoria,
+          unidad_medida: values.unidad_medida, stock_minimo: values.stock_minimo,
+          estado: values.estado,
+        }
         const { error } = await supabase.from('insumos').update(values).eq('id', id)
         if (error) throw error
+        await supabase.from('auditoria_insumos').insert({
+          insumo_id: id, editado_por: perfil.id,
+          datos_anteriores: datosAnteriores, datos_nuevos: datosNuevos,
+        })
       } else {
         const { error } = await supabase.from('insumos').insert({ ...values, stock_actual: 0 })
         if (error) throw error

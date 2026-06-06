@@ -5,7 +5,7 @@ import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../context/AuthContext'
 import { useA11y } from '../../../context/AccessibilityContext'
 import { formatDate, downloadCSV, getLabelFromValue, TIPOS_TRATAMIENTO } from '../../../lib/utils'
-import { Plus, Download, Eye, Pencil, Syringe, CheckCircle2, Activity, Layers, Lock, Clock } from 'lucide-react'
+import { Plus, Download, Eye, Pencil, Syringe, CheckCircle2, Activity, Layers, Lock, Clock, Search, User } from 'lucide-react'
 import Button from '../../../components/ui/Button'
 import { StatusBadge } from '../../../components/ui/Badge'
 import PageHeader from '../../../components/ui/PageHeader'
@@ -66,6 +66,7 @@ export default function TratamientosList() {
   const { isAdmin, perfil } = useAuth()
   useA11y()
 
+  const [search,       setSearch]       = useState('')
   const [filterGalpon, setFilterGalpon] = useState('')
   const [filterEstado, setFilterEstado] = useState('')
   const [filterDesde, setFilterDesde]   = useState('')
@@ -76,7 +77,7 @@ export default function TratamientosList() {
   const { data: galpones } = useQuery({
     queryKey: ['galpones-select', isAdmin, perfil?.id],
     queryFn: async () => {
-      let q = supabase.from('galpones').select('id, nombre').eq('estado', 'activo').order('nombre')
+      let q = supabase.from('galpones').select('id, nombre').in('estado', ['en_produccion', 'disponible']).order('nombre')
       if (!isAdmin) q = q.eq('encargado_id', perfil.id)
       const { data } = await q
       return data || []
@@ -118,8 +119,20 @@ export default function TratamientosList() {
     return { total, enCurso, finalizados, tiposDistintos }
   }, [data])
 
-  const totalPages = Math.ceil((data?.length || 0) / pageSize)
-  const paginated  = (data || []).slice((page - 1) * pageSize, page * pageSize)
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim()
+    if (!q) return data || []
+    return (data || []).filter(r =>
+      r.responsable?.toLowerCase().includes(q) ||
+      r.nombre_producto?.toLowerCase().includes(q) ||
+      r.galpon?.nombre?.toLowerCase().includes(q) ||
+      r.lote?.nombre_numero?.toLowerCase().includes(q) ||
+      getLabelFromValue(TIPOS_TRATAMIENTO, r.tipo)?.toLowerCase().includes(q)
+    )
+  }, [data, search])
+
+  const totalPages = Math.ceil(filtered.length / pageSize)
+  const paginated  = filtered.slice((page - 1) * pageSize, page * pageSize)
 
   function handleExport() {
     downloadCSV((data || []).map(r => ({
@@ -144,7 +157,7 @@ export default function TratamientosList() {
         actions={
           <div className="flex gap-2">
             <Button variant="secondary" icon={Download} onClick={handleExport}>Exportar CSV</Button>
-            {isAdmin && <Link to="/dashboard/tratamientos/nuevo"><Button icon={Plus}>Nuevo</Button></Link>}
+            <Link to="/dashboard/tratamientos/nuevo"><Button icon={Plus}>Nuevo</Button></Link>
           </div>
         }
       />
@@ -186,7 +199,18 @@ export default function TratamientosList() {
       </div>
 
       {/* ── Filter bar ── */}
-      <div className="card p-4">
+      <div className="card p-4 space-y-3">
+        {/* Búsqueda */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400 pointer-events-none" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1) }}
+            placeholder="Buscar por responsable, producto, galpón, lote o tipo…"
+            className="input-base pl-9 w-full"
+          />
+        </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div>
             <label className="label text-xs">Galpón</label>
@@ -230,20 +254,33 @@ export default function TratamientosList() {
             />
           </div>
         </div>
+        {/* Contador de resultados cuando hay búsqueda activa */}
+        {search && (
+          <p className="text-xs text-stone-500 dark:text-stone-400">
+            {filtered.length === 0
+              ? 'Sin resultados para esta búsqueda'
+              : <><strong className="text-stone-700 dark:text-stone-200">{filtered.length}</strong> resultado{filtered.length !== 1 ? 's' : ''} encontrado{filtered.length !== 1 ? 's' : ''}</>
+            }
+          </p>
+        )}
       </div>
 
       {/* ── Table ── */}
       <div className="card overflow-hidden">
         {isLoading ? (
-          <TableSkeleton rows={5} cols={6} />
+          <TableSkeleton rows={5} cols={7} />
         ) : paginated.length === 0 ? (
-          <EmptyState icon={Syringe} title="No hay tratamientos registrados" />
+          <EmptyState
+            icon={Syringe}
+            title={search ? 'Sin resultados' : 'No hay tratamientos registrados'}
+            description={search ? 'Intenta con otros términos de búsqueda.' : undefined}
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-stone-50 dark:bg-stone-800/50 border-b border-stone-200 dark:border-stone-700">
                 <tr>
-                  {['Inicio', 'Galpón', 'Lote', 'Tipo', 'Producto', 'Estado', 'Acciones'].map(h => (
+                  {['Inicio', 'Galpón', 'Lote', 'Tipo', 'Producto', 'Responsable', 'Estado', 'Acciones'].map(h => (
                     <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide whitespace-nowrap">
                       {h}
                     </th>
@@ -272,6 +309,18 @@ export default function TratamientosList() {
                     </td>
                     <td className="px-4 py-3 text-stone-700 dark:text-stone-300 whitespace-nowrap">
                       {r.nombre_producto}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {r.responsable ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center flex-shrink-0">
+                            <User className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                          </div>
+                          <span className="text-stone-700 dark:text-stone-300 font-medium">{r.responsable}</span>
+                        </div>
+                      ) : (
+                        <span className="text-stone-400 dark:text-stone-500">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <StatusBadge status={r.estado} />
@@ -315,7 +364,7 @@ export default function TratamientosList() {
             </table>
           </div>
         )}
-        {(data?.length || 0) > 0 && (
+        {filtered.length > 0 && (
           <Pagination
             page={page}
             totalPages={totalPages}

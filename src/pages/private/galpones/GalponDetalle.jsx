@@ -8,10 +8,46 @@ import { formatDate, formatNumber, calcWeeksAge } from '../../../lib/utils'
 import PageHeader from '../../../components/ui/PageHeader'
 import Button from '../../../components/ui/Button'
 import Badge, { StatusBadge } from '../../../components/ui/Badge'
+import AuditHistorial from '../../../components/ui/AuditHistorial'
 import { Pencil, Plus, Egg, Building2, Users, Layers, Calendar, Activity } from 'lucide-react'
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { format, subDays } from 'date-fns'
 import { Skeleton } from '../../../components/ui/Skeleton'
+
+const ESTADO_LABELS = {
+  disponible:       'Disponible',
+  en_produccion:    'En producción',
+  en_mantenimiento: 'En mantenimiento',
+  activo:           'Activo',
+  inactivo:         'Inactivo',
+}
+
+function formatearCambios(ant, nue) {
+  if (!ant || !nue) return []
+  const campos = [
+    { key: 'nombre',           label: 'Nombre' },
+    { key: 'estado',           label: 'Estado' },
+    { key: 'capacidad_maxima', label: 'Capacidad máxima' },
+    { key: 'descripcion',      label: 'Descripción' },
+    { key: 'encargado_id',     label: 'Encargado' },
+  ]
+  return campos.reduce((acc, c) => {
+    const a = ant[c.key]
+    const n = nue[c.key]
+    if (String(a ?? '') !== String(n ?? '')) {
+      let va = a ?? '—'
+      let vn = n ?? '—'
+      if (c.key === 'estado') { va = ESTADO_LABELS[a] || a || '—'; vn = ESTADO_LABELS[n] || n || '—' }
+      if (c.key === 'encargado_id') { va = a ? 'Asignado' : 'Sin asignar'; vn = n ? 'Asignado' : 'Sin asignar' }
+      if (c.key === 'capacidad_maxima') {
+        va = a != null ? Number(a).toLocaleString('es-CO') : '—'
+        vn = n != null ? Number(n).toLocaleString('es-CO') : '—'
+      }
+      acc.push({ campo: c.label, anterior: va, nuevo: vn })
+    }
+    return acc
+  }, [])
+}
 
 /* ── Stat item ── */
 function StatItem({ label, value, accent }) {
@@ -23,7 +59,7 @@ function StatItem({ label, value, accent }) {
   )
 }
 
-/* ── Occupancy gauge (horizontal) ── */
+/* ── Occupancy gauge ── */
 function OccupancyGauge({ current, max }) {
   const pct = max > 0 ? Math.min((current / max) * 100, 100) : 0
   const barColor = pct > 90 ? 'from-red-400 to-red-600'
@@ -111,6 +147,27 @@ export default function GalponDetalle() {
     enabled: !!id,
   })
 
+  const { data: historial, isLoading: historialLoading } = useQuery({
+    queryKey: ['galpon-historial', id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('auditoria')
+        .select('id, usuario_nombre, datos_anteriores, datos_nuevos, created_at')
+        .eq('tabla', 'galpones')
+        .eq('registro_id', id)
+        .eq('operacion', 'UPDATE')
+        .order('created_at', { ascending: false })
+        .limit(30)
+      // Adapta al formato que espera AuditHistorial
+      return (data || []).map(e => ({
+        ...e,
+        editado:    { nombre_completo: e.usuario_nombre },
+        editado_at: e.created_at,
+      }))
+    },
+    enabled: !!id,
+  })
+
   /* Loading skeleton */
   if (isLoading) return (
     <div className="space-y-5">
@@ -132,7 +189,19 @@ export default function GalponDetalle() {
   const loteActivo      = galpon.lotes?.find(l => l.estado === 'activo')
   const lotesAnteriores = galpon.lotes?.filter(l => l.estado !== 'activo') || []
   const avesActuales    = loteActivo?.cantidad_aves_actuales || 0
-  const isActivo        = galpon.estado === 'activo'
+
+  const STRIP = {
+    en_produccion:    'bg-gradient-to-r from-amber-400 to-primary-600',
+    disponible:       'bg-gradient-to-r from-emerald-400 to-emerald-600',
+    en_mantenimiento: 'bg-gradient-to-r from-blue-400 to-blue-600',
+  }
+  const ICON_BG = {
+    en_produccion:    'bg-gradient-to-br from-amber-400 to-amber-600 shadow-lg shadow-amber-500/25',
+    disponible:       'bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-lg shadow-emerald-500/25',
+    en_mantenimiento: 'bg-gradient-to-br from-blue-400 to-blue-600 shadow-lg shadow-blue-500/25',
+  }
+  const stripClass  = STRIP[galpon.estado]   || 'bg-stone-200 dark:bg-stone-700'
+  const iconBgClass = ICON_BG[galpon.estado] || 'bg-stone-100 dark:bg-stone-800'
 
   return (
     <div className="space-y-5">
@@ -151,14 +220,14 @@ export default function GalponDetalle() {
       />
 
       {/* ── Hero card ── */}
-      <div className={`card overflow-hidden`}>
-        <div className={`h-1.5 w-full ${isActivo ? 'bg-gradient-to-r from-amber-400 to-primary-600' : 'bg-stone-200 dark:bg-stone-700'}`} />
+      <div className="card overflow-hidden">
+        <div className={`h-1.5 w-full ${stripClass}`} />
         <div className="p-6">
           <div className="flex flex-col sm:flex-row sm:items-start gap-5">
-            {/* Left: icon + name + description */}
+            {/* Left: icon + name + metadata */}
             <div className="flex items-start gap-4 flex-1">
-              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${isActivo ? 'bg-gradient-to-br from-amber-400 to-amber-600 shadow-lg shadow-amber-500/25' : 'bg-stone-100 dark:bg-stone-800'}`}>
-                <Building2 className={`h-7 w-7 ${isActivo ? 'text-white' : 'text-stone-400 dark:text-stone-500'}`} aria-hidden="true" />
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${iconBgClass}`}>
+                <Building2 className="h-7 w-7 text-white" aria-hidden="true" />
               </div>
               <div>
                 <div className="flex items-center gap-3 flex-wrap">
@@ -180,6 +249,10 @@ export default function GalponDetalle() {
                       </span>
                     </div>
                   )}
+                  <div className="flex items-center gap-1.5 text-xs text-stone-500 dark:text-stone-400">
+                    <Calendar className="h-3.5 w-3.5" aria-hidden="true" />
+                    Creado el {formatDate(galpon.created_at)}
+                  </div>
                 </div>
               </div>
             </div>
@@ -224,12 +297,12 @@ export default function GalponDetalle() {
 
         {loteActivo ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-            <StatItem label="Número de lote"     value={loteActivo.nombre_numero} />
-            <StatItem label="Raza"               value={loteActivo.raza?.nombre} />
-            <StatItem label="Aves actuales"      value={formatNumber(loteActivo.cantidad_aves_actuales)} accent="text-green-600 dark:text-green-400" />
-            <StatItem label="Aves iniciales"     value={formatNumber(loteActivo.cantidad_inicial_aves)} />
-            <StatItem label="Semanas de vida"    value={`${calcWeeksAge(loteActivo.fecha_ingreso)} sem.`} />
-            <StatItem label="Fecha de ingreso"   value={formatDate(loteActivo.fecha_ingreso)} />
+            <StatItem label="Número de lote"   value={loteActivo.nombre_numero} />
+            <StatItem label="Raza"             value={loteActivo.raza?.nombre} />
+            <StatItem label="Aves actuales"    value={formatNumber(loteActivo.cantidad_aves_actuales)} accent="text-green-600 dark:text-green-400" />
+            <StatItem label="Aves iniciales"   value={formatNumber(loteActivo.cantidad_inicial_aves)} />
+            <StatItem label="Semanas de vida"  value={`${calcWeeksAge(loteActivo.fecha_ingreso)} sem.`} />
+            <StatItem label="Fecha de ingreso" value={formatDate(loteActivo.fecha_ingreso)} />
           </div>
         ) : (
           <div className="flex items-center justify-center py-8 text-center">
@@ -301,6 +374,14 @@ export default function GalponDetalle() {
           <Button variant="secondary">Registrar mortalidad</Button>
         </Link>
       </div>
+
+      {/* ── Historial de cambios ── */}
+      <AuditHistorial
+        entries={historial}
+        loading={historialLoading}
+        formatCambios={formatearCambios}
+        emptyMessage="Este galpón no ha sido editado desde su creación."
+      />
 
       {/* ── Lotes anteriores ── */}
       {lotesAnteriores.length > 0 && (

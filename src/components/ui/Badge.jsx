@@ -20,11 +20,14 @@ export default function Badge({ children, variant = 'gray', className = '' }) {
 
 export function StatusBadge({ status }) {
   const map = {
-    activo:      { label: 'Activo',      variant: 'green'  },
-    inactivo:    { label: 'Inactivo',    variant: 'gray'   },
-    finalizado:  { label: 'Finalizado',  variant: 'blue'   },
-    suspendido:  { label: 'Suspendido',  variant: 'yellow' },
-    pendiente:   { label: 'Pendiente',   variant: 'amber'  },
+    activo:           { label: 'Activo',            variant: 'green'  },
+    inactivo:         { label: 'Inactivo',          variant: 'gray'   },
+    finalizado:       { label: 'Finalizado',        variant: 'blue'   },
+    suspendido:       { label: 'Suspendido',        variant: 'yellow' },
+    pendiente:        { label: 'Pendiente',         variant: 'amber'  },
+    disponible:       { label: 'Disponible',        variant: 'green'  },
+    en_produccion:    { label: 'En producción',     variant: 'amber'  },
+    en_mantenimiento: { label: 'En mantenimiento',  variant: 'blue'   },
   }
   const s = map[status] ?? { label: status, variant: 'gray' }
   return <Badge variant={s.variant}>{s.label}</Badge>

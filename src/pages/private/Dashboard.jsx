@@ -304,7 +304,7 @@ export default function Dashboard() {
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       /* 1. Galpones */
-      let galQ = supabase.from('galpones').select('id, nombre').eq('estado', 'activo')
+      let galQ = supabase.from('galpones').select('id, nombre').eq('estado', 'en_produccion')
       if (!isAdmin) galQ = galQ.eq('encargado_id', perfil.id)
       const { data: galpones } = await galQ
       const galponIds = (galpones || []).map(g => g.id)

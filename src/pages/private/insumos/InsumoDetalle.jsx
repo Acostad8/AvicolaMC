@@ -6,12 +6,31 @@ import PageHeader from '../../../components/ui/PageHeader'
 import Button from '../../../components/ui/Button'
 import { StatusBadge } from '../../../components/ui/Badge'
 import { Skeleton } from '../../../components/ui/Skeleton'
+import AuditHistorial from '../../../components/ui/AuditHistorial'
 import { useAuth } from '../../../context/AuthContext'
 import {
   Pencil, Plus, AlertTriangle, Package, Boxes,
   ArrowDownCircle, ArrowUpCircle,
   BarChart3, Calendar, User,
 } from 'lucide-react'
+
+/* ── Audit diff formatter ── */
+function formatCambiosInsumo(ant, nue) {
+  const etiquetas = {
+    nombre:        'Nombre',
+    categoria:     'Categoría',
+    unidad_medida: 'Unidad de medida',
+    stock_minimo:  'Stock mínimo',
+    estado:        'Estado',
+  }
+  return Object.keys(etiquetas).reduce((acc, campo) => {
+    const a = ant?.[campo] ?? null
+    const b = nue?.[campo] ?? null
+    if (String(a ?? '') !== String(b ?? ''))
+      acc.push({ campo: etiquetas[campo], anterior: a ?? '—', nuevo: b ?? '—' })
+    return acc
+  }, [])
+}
 
 /* ── Mapa visual por categoría ── */
 const CATEGORIA_META = {
@@ -102,6 +121,21 @@ export default function InsumoDetalle() {
         .limit(50)
       return data || []
     },
+  })
+
+  const { data: auditoria, isLoading: loadingAudit } = useQuery({
+    queryKey: ['auditoria-insumo', id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('auditoria_insumos')
+        .select('*, editado:perfiles(nombre_completo)')
+        .eq('insumo_id', id)
+        .order('editado_at', { ascending: false })
+      if (error) throw error
+      return data || []
+    },
+    enabled: !!id && isAdmin,
+    retry: 1,
   })
 
   if (isLoading) return <LoadingSkeleton />
@@ -209,7 +243,7 @@ export default function InsumoDetalle() {
         />
       </div>
 
-      {/* ── Historial ── */}
+      {/* ── Historial de movimientos ── */}
       <div className="card overflow-hidden">
         <div className="flex items-center gap-3 px-5 py-4 border-b border-stone-100 dark:border-stone-800">
           <div className="w-8 h-8 bg-stone-100 dark:bg-stone-800 rounded-lg flex items-center justify-center">
@@ -292,6 +326,16 @@ export default function InsumoDetalle() {
           </div>
         )}
       </div>
+
+      {/* ── Historial de cambios (solo admin) ── */}
+      {isAdmin && (
+        <AuditHistorial
+          entries={auditoria}
+          loading={loadingAudit}
+          formatCambios={formatCambiosInsumo}
+          emptyMessage="Este insumo no ha sido editado desde su creación."
+        />
+      )}
     </div>
   )
 }

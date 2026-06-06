@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../context/AuthContext'
 import { useA11y } from '../../../context/AccessibilityContext'
-import { Plus, Pencil, Trash2, Bird, Search, X, Egg } from 'lucide-react'
+import { Plus, Pencil, Trash2, Bird, Search, X, Egg, AlertTriangle, Layers } from 'lucide-react'
 import Button from '../../../components/ui/Button'
 import Badge from '../../../components/ui/Badge'
 import Input from '../../../components/ui/Input'
@@ -23,7 +23,7 @@ const schema = z.object({
 })
 
 /* ── Raza card ── */
-function RazaCard({ raza, isAdmin, onEdit, onDelete, index, noMotion }) {
+function RazaCard({ raza, isAdmin, onEdit, onDelete, checking, index, noMotion }) {
   return (
     <article
       className="card flex flex-col gap-0 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-200 group"
@@ -80,6 +80,8 @@ function RazaCard({ raza, isAdmin, onEdit, onDelete, index, noMotion }) {
               size="sm"
               icon={Trash2}
               onClick={() => onDelete(raza)}
+              loading={checking}
+              disabled={checking}
               className="text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
               aria-label={`Eliminar ${raza.nombre}`}
             />
@@ -96,6 +98,8 @@ export default function RazasList({ embedded = false }) {
   const qc = useQueryClient()
   const [modal, setModal]           = useState(null)
   const [deleteRaza, setDeleteRaza] = useState(null)
+  const [blockedRaza, setBlockedRaza] = useState(null)
+  const [checkingId, setCheckingId]   = useState(null)
   const [search, setSearch]         = useState('')
   const [filterTipo, setFilterTipo] = useState('')
 
@@ -152,6 +156,23 @@ export default function RazasList({ embedded = false }) {
   function openNew() {
     reset({ nombre: '', descripcion: '' })
     setModal({})
+  }
+
+  async function handleDeleteClick(raza) {
+    setCheckingId(raza.id)
+    try {
+      const { count } = await supabase
+        .from('lotes')
+        .select('id', { count: 'exact', head: true })
+        .eq('raza_id', raza.id)
+      if (count > 0) {
+        setBlockedRaza({ ...raza, lotesCount: count })
+      } else {
+        setDeleteRaza(raza)
+      }
+    } finally {
+      setCheckingId(null)
+    }
   }
 
   /* Filter */
@@ -250,7 +271,8 @@ export default function RazasList({ embedded = false }) {
               raza={r}
               isAdmin={isAdmin}
               onEdit={openEdit}
-              onDelete={setDeleteRaza}
+              onDelete={handleDeleteClick}
+              checking={checkingId === r.id}
               index={i}
               noMotion={noMotion}
             />
@@ -288,6 +310,34 @@ export default function RazasList({ embedded = false }) {
         </form>
       </Modal>
 
+      {/* Modal bloqueante: raza con lotes asociados */}
+      <Modal
+        open={!!blockedRaza}
+        onClose={() => setBlockedRaza(null)}
+        title="No se puede eliminar"
+        footer={<Button onClick={() => setBlockedRaza(null)}>Entendido</Button>}
+      >
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 p-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-xl">
+            <AlertTriangle className="h-5 w-5 text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-red-700 dark:text-red-300">
+                La raza "{blockedRaza?.nombre}" tiene {blockedRaza?.lotesCount} lote{blockedRaza?.lotesCount !== 1 ? 's' : ''} asociado{blockedRaza?.lotesCount !== 1 ? 's' : ''}
+              </p>
+              <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                No es posible eliminar una raza vinculada a lotes existentes.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3 p-3 bg-stone-50 dark:bg-stone-800/60 border border-stone-200 dark:border-stone-700 rounded-xl">
+            <Layers className="h-4 w-4 text-stone-400 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-stone-600 dark:text-stone-400">
+              Para eliminar esta raza primero debes cambiar la raza asignada en los lotes que la utilizan, o eliminar esos lotes.
+            </p>
+          </div>
+        </div>
+      </Modal>
+
       {/* Delete confirm */}
       <ConfirmModal
         open={!!deleteRaza}
@@ -295,7 +345,7 @@ export default function RazasList({ embedded = false }) {
         onConfirm={() => deleteMutation.mutate(deleteRaza.id)}
         loading={deleteMutation.isPending}
         title="Eliminar raza"
-        message={`¿Eliminar la raza "${deleteRaza?.nombre}"? Si tiene lotes asociados, esos lotes quedarán sin raza. Esta acción no se puede deshacer.`}
+        message={`¿Eliminar la raza "${deleteRaza?.nombre}"? Esta acción no se puede deshacer.`}
         confirmLabel="Eliminar"
       />
     </div>

@@ -6,6 +6,7 @@ import { formatDate, getLabelFromValue, TIPOS_TRATAMIENTO } from '../../../lib/u
 import PageHeader from '../../../components/ui/PageHeader'
 import Button from '../../../components/ui/Button'
 import { Skeleton } from '../../../components/ui/Skeleton'
+import AuditHistorial from '../../../components/ui/AuditHistorial'
 import {
   Pencil, Download, Syringe, Pill, FlaskConical, Shield,
   Bug, Activity, Building2, Calendar, CalendarCheck,
@@ -24,6 +25,27 @@ const TIPO_META = {
   otro:            { Icon: Activity,     color: 'from-stone-500 to-stone-700',   light: 'bg-stone-50 dark:bg-stone-800',      text: 'text-stone-600 dark:text-stone-400',   ring: 'ring-stone-200 dark:ring-stone-700',   badge: 'bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400'     },
 }
 const getMeta = tipo => TIPO_META[tipo] || TIPO_META.otro
+
+/* ── Audit diff formatter ── */
+function formatCambiosTratamiento(ant, nue) {
+  const etiquetas = {
+    fecha_inicio:     'Fecha de inicio',
+    fecha_fin:        'Fecha de fin',
+    tipo:             'Tipo de tratamiento',
+    cantidad_usada:   'Cantidad usada',
+    dosis_aplicacion: 'Dosis y aplicación',
+    responsable:      'Responsable',
+    estado:           'Estado',
+    observaciones:    'Observaciones',
+  }
+  return Object.keys(etiquetas).reduce((acc, campo) => {
+    const a = ant?.[campo] ?? null
+    const b = nue?.[campo] ?? null
+    if (String(a ?? '') !== String(b ?? ''))
+      acc.push({ campo: etiquetas[campo], anterior: a ?? '—', nuevo: b ?? '—' })
+    return acc
+  }, [])
+}
 
 /* ── Duration progress bar ── */
 function DurationBar({ fechaInicio, fechaFin, isActivo, meta }) {
@@ -138,11 +160,26 @@ export default function TratamientoDetalle() {
     queryFn: async () => {
       const { data } = await supabase
         .from('tratamientos')
-        .select('*, galpon:galpones(nombre), lote:lotes(nombre_numero)')
+        .select('*, galpon:galpones(nombre), lote:lotes(nombre_numero), empleado:empleados(id, nombre_completo, cargo)')
         .eq('id', id)
         .single()
       return data
     },
+  })
+
+  const { data: auditoria, isLoading: loadingAudit } = useQuery({
+    queryKey: ['auditoria-tratamiento', id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('auditoria_tratamientos')
+        .select('*, editado:perfiles(nombre_completo)')
+        .eq('tratamiento_id', id)
+        .order('editado_at', { ascending: false })
+      if (error) throw error
+      return data || []
+    },
+    enabled: !!id && isAdmin,
+    retry: 1,
   })
 
   function downloadPDF() {
@@ -298,18 +335,44 @@ export default function TratamientoDetalle() {
           {/* Responsable */}
           <div className="card p-5">
             <div className="flex items-center gap-2 mb-4 pb-3 border-b border-stone-100 dark:border-stone-800">
-              <div className="w-7 h-7 bg-gradient-to-br from-stone-400 to-stone-600 rounded-lg flex items-center justify-center">
+              <div className="w-7 h-7 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-lg flex items-center justify-center">
                 <User className="h-3.5 w-3.5 text-white" />
               </div>
-              <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-300">Responsable</h3>
+              <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-300">Empleado responsable</h3>
             </div>
-            <Field
-              icon={User}
-              label="Veterinario / encargado"
-              value={t.responsable}
-              iconBg={meta.light}
-              accent={meta.text}
-            />
+            {t.empleado ? (
+              <Link to={`/dashboard/empleados/${t.empleado.id}`} className="block group">
+                <div className="flex items-center gap-4 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 hover:shadow-md transition-all hover:-translate-y-0.5">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center flex-shrink-0 shadow-md">
+                    <User className="h-6 w-6 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-stone-800 dark:text-stone-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors leading-tight">
+                      {t.empleado.nombre_completo}
+                    </p>
+                    {t.empleado.cargo && (
+                      <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">{t.empleado.cargo}</p>
+                    )}
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1 font-medium">Ver perfil →</p>
+                  </div>
+                </div>
+              </Link>
+            ) : t.responsable ? (
+              <Field
+                icon={User}
+                label="Responsable (registro histórico)"
+                value={t.responsable}
+                iconBg="bg-stone-100 dark:bg-stone-800"
+                accent="text-stone-500 dark:text-stone-400"
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center py-6 text-center gap-2">
+                <div className="w-12 h-12 rounded-2xl bg-stone-100 dark:bg-stone-800 flex items-center justify-center">
+                  <User className="h-6 w-6 text-stone-300 dark:text-stone-600" />
+                </div>
+                <p className="text-sm text-stone-400 dark:text-stone-500">Sin responsable asignado</p>
+              </div>
+            )}
           </div>
 
           {/* Observaciones */}
@@ -323,6 +386,15 @@ export default function TratamientoDetalle() {
               </div>
               <p className="text-sm text-stone-600 dark:text-stone-400 leading-relaxed whitespace-pre-wrap">{t.observaciones}</p>
             </div>
+          )}
+
+          {/* Historial de cambios (solo admin) */}
+          {isAdmin && (
+            <AuditHistorial
+              entries={auditoria}
+              loading={loadingAudit}
+              formatCambios={formatCambiosTratamiento}
+            />
           )}
         </div>
 

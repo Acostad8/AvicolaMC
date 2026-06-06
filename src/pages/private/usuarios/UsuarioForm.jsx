@@ -262,7 +262,7 @@ export default function UsuarioForm() {
   const { data: galpones } = useQuery({
     queryKey: ['galpones-todos'],
     queryFn: async () => {
-      const { data } = await supabase.from('galpones').select('id, nombre').eq('estado', 'activo').order('nombre')
+      const { data } = await supabase.from('galpones').select('id, nombre').in('estado', ['en_produccion', 'disponible']).order('nombre')
       return data || []
     },
   })

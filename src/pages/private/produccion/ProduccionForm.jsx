@@ -11,6 +11,7 @@ import Input from '../../../components/ui/Input'
 import Select from '../../../components/ui/Select'
 import Textarea from '../../../components/ui/Textarea'
 import Button from '../../../components/ui/Button'
+import Modal from '../../../components/ui/Modal'
 import PageHeader from '../../../components/ui/PageHeader'
 import toast from 'react-hot-toast'
 import {
@@ -223,7 +224,18 @@ export default function ProduccionForm() {
   const navigate = useNavigate()
   const { isAdmin, perfil } = useAuth()
   const qc = useQueryClient()
-  const [posturaCalc, setPosturaCalc] = useState(null)
+  const [posturaCalc, setPosturaCalc]     = useState(null)
+  const [confirmOpen, setConfirmOpen]     = useState(false)
+  const [pendingValues, setPendingValues] = useState(null)
+
+  const onSubmit = (values) => {
+    if (isEdit) {
+      setPendingValues(values)
+      setConfirmOpen(true)
+    } else {
+      mutation.mutate(values)
+    }
+  }
 
   const { register, handleSubmit, watch, reset, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
@@ -272,7 +284,7 @@ export default function ProduccionForm() {
   const { data: galpones } = useQuery({
     queryKey: ['galpones-select', isAdmin, perfil?.id],
     queryFn: async () => {
-      let q = supabase.from('galpones').select('id, nombre').eq('estado', 'activo').order('nombre')
+      let q = supabase.from('galpones').select('id, nombre').eq('estado', 'en_produccion').order('nombre')
       if (!isAdmin) q = q.eq('encargado_id', perfil.id)
       const { data } = await q
       return data || []
@@ -423,7 +435,7 @@ export default function ProduccionForm() {
 
         {/* ── Formulario principal (2/3) ── */}
         <form
-          onSubmit={handleSubmit(v => mutation.mutate(v))}
+          onSubmit={handleSubmit(onSubmit)}
           className="lg:col-span-2 card p-6 space-y-7"
         >
           {/* Form header */}
@@ -611,6 +623,81 @@ export default function ProduccionForm() {
           superaAves={!!superaAves}
         />
       </div>
+
+      {/* ── Modal de confirmación (solo edición) ── */}
+      <Modal
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title="Confirmar cambios"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setConfirmOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={() => { setConfirmOpen(false); mutation.mutate(pendingValues) }}
+              loading={mutation.isPending}
+            >
+              Confirmar cambios
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-stone-600 dark:text-stone-400">Revisa los cambios antes de guardar:</p>
+          <div className="space-y-2">
+            {[
+              {
+                label: 'Fecha',
+                oldVal: registro?.fecha,
+                newVal: pendingValues?.fecha,
+                format: v => v
+                  ? new Date(v + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })
+                  : '—',
+              },
+              {
+                label: 'Huevos producidos',
+                oldVal: registro?.huevos_producidos,
+                newVal: pendingValues ? Number(pendingValues.huevos_producidos) : null,
+                format: v => v != null ? Number(v).toLocaleString('es-CO') : '—',
+              },
+              {
+                label: 'Consumo de alimento (kg)',
+                oldVal: registro?.consumo_alimento_kg ?? 0,
+                newVal: pendingValues ? Number(pendingValues.consumo_alimento_kg) : null,
+                format: v => v != null ? `${Number(v).toLocaleString('es-CO')} kg` : '—',
+              },
+              {
+                label: 'Observaciones',
+                oldVal: registro?.observaciones || '',
+                newVal: pendingValues?.observaciones || '',
+                format: v => v || '—',
+              },
+            ].map(({ label, oldVal, newVal, format }) => {
+              const changed = String(oldVal ?? '') !== String(newVal ?? '')
+              return (
+                <div
+                  key={label}
+                  className={`rounded-xl border px-4 py-3 ${
+                    changed
+                      ? 'border-amber-200 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-950/20'
+                      : 'border-stone-100 dark:border-stone-800 bg-stone-50/60 dark:bg-stone-800/30'
+                  }`}
+                >
+                  <p className="text-xs font-medium text-stone-500 dark:text-stone-400 mb-1">{label}</p>
+                  {changed ? (
+                    <div className="flex items-center gap-2 text-sm flex-wrap">
+                      <span className="line-through text-stone-400 dark:text-stone-500">{format(oldVal)}</span>
+                      <span className="text-stone-400">→</span>
+                      <span className="font-semibold text-stone-800 dark:text-stone-100">{format(newVal)}</span>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-stone-600 dark:text-stone-300">{format(oldVal)}</p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

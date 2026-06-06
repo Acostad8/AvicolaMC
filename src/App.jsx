@@ -132,9 +132,9 @@ export default function App() {
                     <Route path="/dashboard/mortalidad/:id/editar" element={<MortalidadForm />} />
 
                     <Route path="/dashboard/tratamientos" element={<TratamientosList />} />
-                    <Route path="/dashboard/tratamientos/nuevo" element={<AdminRoute><TratamientoForm /></AdminRoute>} />
+                    <Route path="/dashboard/tratamientos/nuevo" element={<TratamientoForm />} />
                     <Route path="/dashboard/tratamientos/:id" element={<TratamientoDetalle />} />
-                    <Route path="/dashboard/tratamientos/:id/editar" element={<AdminRoute><TratamientoForm /></AdminRoute>} />
+                    <Route path="/dashboard/tratamientos/:id/editar" element={<TratamientoForm />} />
 
                     <Route path="/dashboard/insumos" element={<InsumosList />} />
                     <Route path="/dashboard/insumos/nuevo" element={<AdminRoute><InsumoForm /></AdminRoute>} />
