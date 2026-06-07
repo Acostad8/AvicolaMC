@@ -216,6 +216,14 @@ export default function TratamientoForm() {
     empleado_id:      isAdmin ? z.string().min(1, 'Selecciona el empleado responsable') : z.string().optional(),
     estado:           z.enum(['activo', 'finalizado']),
     observaciones:    z.string().optional(),
+  }).superRefine((data, ctx) => {
+    if (data.estado === 'finalizado' && !data.fecha_fin) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Ingresa la fecha de fin del tratamiento',
+        path: ['fecha_fin'],
+      })
+    }
   }), [isEdit, isAdmin])
 
   const { register, handleSubmit, watch, reset, formState: { errors, isSubmitting } } = useForm({
@@ -387,10 +395,22 @@ export default function TratamientoForm() {
         const delta        = new_cantidad - old_cantidad
 
         if (delta !== 0 && tratamiento?.insumo_id && insumoTratamiento) {
-          const nuevoStock = insumoTratamiento.stock_actual - delta
-          if (nuevoStock < 0) throw new Error('No hay stock suficiente para esta corrección')
-          const { error: errStock } = await supabase.from('insumos')
-            .update({ stock_actual: nuevoStock }).eq('id', tratamiento.insumo_id)
+          if (delta > 0 && insumoTratamiento.stock_actual < delta) {
+            throw new Error(`Stock insuficiente. Solo hay ${insumoTratamiento.stock_actual} ${insumoTratamiento.unidad_medida} disponible`)
+          }
+          const tipoMov   = delta > 0 ? 'salida' : 'entrada'
+          const cantMov   = Math.abs(delta)
+          const tipoLbl   = TIPOS_TRATAMIENTO.find(t => t.value === values.tipo)?.label || values.tipo
+          const loteNombre = loteActivo?.nombre_numero ?? tratamiento?.lote_id
+          const { error: errStock } = await supabase.from('movimientos_insumos').insert({
+            fecha:             values.fecha_inicio,
+            tipo:              tipoMov,
+            insumo_id:         tratamiento.insumo_id,
+            cantidad:          cantMov,
+            destino_proveedor: `Corrección tratamiento: ${tipoLbl} — Lote ${loteNombre}`,
+            observaciones:     `Ajuste por edición (cantidad anterior: ${old_cantidad}, nueva: ${new_cantidad})`,
+            registrado_por:    perfil?.id,
+          })
           if (errStock) throw errStock
         }
 
@@ -521,7 +541,13 @@ export default function TratamientoForm() {
           <FormSection icon={CalendarDays} title="Fechas y galpón" gradient="from-blue-400 to-blue-600">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input label="Fecha de inicio" type="date" error={errors.fecha_inicio?.message} disabled={fueraDePlazo} {...register('fecha_inicio')} />
-              <Input label="Fecha de fin (opcional)" type="date" disabled={fueraDePlazo} {...register('fecha_fin')} />
+              <Input
+                label={estado === 'finalizado' ? 'Fecha de fin *' : 'Fecha de fin (opcional)'}
+                type="date"
+                error={errors.fecha_fin?.message}
+                disabled={fueraDePlazo}
+                {...register('fecha_fin')}
+              />
               <div className="sm:col-span-2">
                 <Select
                   label="Galpón"
@@ -690,6 +716,12 @@ export default function TratamientoForm() {
                 disabled={fueraDePlazo}
                 {...register('estado')}
               />
+              {estado === 'finalizado' && !fechaFin && !fueraDePlazo && (
+                <div className="flex items-start gap-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2.5 text-xs text-amber-700 dark:text-amber-400">
+                  <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                  <span>Completa la <strong>Fecha de fin</strong> en la sección de fechas para poder guardar.</span>
+                </div>
+              )}
               <Textarea
                 label="Observaciones (opcional)"
                 placeholder="Notas, reacciones observadas, indicaciones…"
