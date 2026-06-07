@@ -14,10 +14,12 @@ export const CONFIG_DEFAULTS = {
     email:     '',
   },
   produccion: {
-    postura_excelente:  90,
-    postura_buena:      75,
-    postura_regular:    50,
-    alerta_mortalidad:   5,
+    postura_excelente:       90,
+    postura_buena:           75,
+    postura_regular:         50,
+    alerta_mortalidad:        5,
+    umbral_dias_tratamiento:  7,
+    peso_promedio_huevo_g:   60,
   },
   notificaciones: {
     habilitadas:   true,

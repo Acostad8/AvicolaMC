@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../context/AuthContext'
 import { useAutoRefreshAtMidnight } from '../../../hooks/useAutoRefreshAtMidnight'
 import { useA11y } from '../../../context/AccessibilityContext'
+import { useConfig } from '../../../context/ConfigContext'
 import { formatDate, formatNumber, calcWeeksAge } from '../../../lib/utils'
 import PageHeader from '../../../components/ui/PageHeader'
 import { StatusBadge } from '../../../components/ui/Badge'
@@ -195,6 +196,7 @@ export default function LoteDetalle() {
   const { id }     = useParams()
   const { isAdmin } = useAuth()
   const { noMotion } = useA11y()
+  const { config } = useConfig()
   const qc         = useQueryClient()
   const [confirmAction, setConfirmAction] = useState(null)
 
@@ -207,6 +209,27 @@ export default function LoteDetalle() {
       return data
     },
   })
+
+  const { data: produccionLote } = useQuery({
+    queryKey: ['lote-produccion-fcr', id],
+    queryFn: async () => {
+      const { data } = await supabase.from('produccion')
+        .select('huevos_producidos, consumo_alimento_kg')
+        .eq('lote_id', id)
+      return data || []
+    },
+    enabled: !!id,
+  })
+
+  const fcrData = useMemo(() => {
+    if (!produccionLote?.length) return null
+    const totalHuevos   = produccionLote.reduce((s, r) => s + (r.huevos_producidos   || 0), 0)
+    const totalAlimento = produccionLote.reduce((s, r) => s + (r.consumo_alimento_kg || 0), 0)
+    if (totalAlimento === 0 || totalHuevos === 0) return null
+    const pesoHuevoKg = (config.produccion?.peso_promedio_huevo_g ?? 60) / 1000
+    const fcr = totalAlimento / (totalHuevos * pesoHuevoKg)
+    return { fcr: fcr.toFixed(2), totalHuevos, totalAlimento: totalAlimento.toFixed(1) }
+  }, [produccionLote, config.produccion?.peso_promedio_huevo_g])
 
   const { data: historial, isLoading: historialLoading } = useQuery({
     queryKey: ['lote-historial', id],
@@ -485,6 +508,27 @@ export default function LoteDetalle() {
                   <span className={`text-sm font-bold tabular-nums ${color || 'text-stone-800 dark:text-stone-100'}`}>{value}</span>
                 </div>
               ))}
+              {/* FCR */}
+              <div className="flex items-center justify-between py-2 border-b border-stone-50 dark:border-stone-800/60 last:border-0">
+                <div>
+                  <span className="text-xs text-stone-500 dark:text-stone-400">FCR del lote</span>
+                  <p className="text-[10px] text-stone-400 dark:text-stone-500">kg alimento / kg huevos</p>
+                </div>
+                {fcrData ? (
+                  <div className="text-right">
+                    <span className={`text-sm font-bold tabular-nums ${
+                      parseFloat(fcrData.fcr) <= 2.5
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : parseFloat(fcrData.fcr) <= 3.0
+                        ? 'text-amber-600 dark:text-amber-400'
+                        : 'text-red-600 dark:text-red-400'
+                    }`}>{fcrData.fcr}</span>
+                    <p className="text-[10px] text-stone-400 dark:text-stone-500">{fcrData.totalAlimento} kg alimento</p>
+                  </div>
+                ) : (
+                  <span className="text-sm font-bold text-stone-400 dark:text-stone-500">—</span>
+                )}
+              </div>
             </div>
           </div>
         </div>

@@ -10,6 +10,7 @@ import {
   Package, Tag, CalendarDays, FileText,
   CheckCircle2, AlertCircle, TrendingUp, TrendingDown,
 } from 'lucide-react'
+import { useAlertasUmbrales } from '../../../hooks/useAlertasUmbrales'
 import Input from '../../../components/ui/Input'
 import Select from '../../../components/ui/Select'
 import Textarea from '../../../components/ui/Textarea'
@@ -173,6 +174,7 @@ export default function MovimientoForm() {
   const { perfil } = useAuth()
   const qc         = useQueryClient()
   const isAdmin    = perfil?.rol === 'administrador'
+  const { checkStockMinimo } = useAlertasUmbrales()
 
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
@@ -193,7 +195,7 @@ export default function MovimientoForm() {
     queryKey: ['insumos-activos'],
     queryFn: async () => {
       const { data } = await supabase.from('insumos')
-        .select('id, nombre, categoria, unidad_medida, stock_actual')
+        .select('id, nombre, categoria, unidad_medida, stock_actual, stock_minimo')
         .eq('estado', 'activo').order('nombre')
       return data || []
     },
@@ -244,7 +246,15 @@ export default function MovimientoForm() {
       })
       if (error) throw error
     },
-    onSuccess: () => {
+    onSuccess: (_, values) => {
+      if (values.tipo === 'salida' && insumoSeleccionado) {
+        checkStockMinimo({
+          insumoNombre: insumoSeleccionado.nombre,
+          stockPost:    Math.max(0, insumoSeleccionado.stock_actual - Number(values.cantidad)),
+          stockMinimo:  insumoSeleccionado.stock_minimo ?? 0,
+          unidad:       insumoSeleccionado.unidad_medida,
+        })
+      }
       qc.invalidateQueries(['insumos'])
       qc.invalidateQueries(['movimientos-insumo'])
       toast.success('Movimiento registrado correctamente')

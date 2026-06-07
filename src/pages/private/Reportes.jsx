@@ -7,7 +7,7 @@ import { formatDate, downloadCSV, getLabelFromValue, CAUSAS_MORTALIDAD, TIPOS_TR
 import Button from '../../components/ui/Button'
 import { StatusBadge } from '../../components/ui/Badge'
 import PageHeader from '../../components/ui/PageHeader'
-import { Download, FileText, Egg, Skull, Syringe, Package, BarChart2, ChevronUp, ChevronDown, ArrowUpDown, Crown } from 'lucide-react'
+import { Download, FileText, Egg, Skull, Syringe, Package, BarChart2, ChevronUp, ChevronDown, ArrowUpDown, Crown, AlertTriangle } from 'lucide-react'
 import { TableSkeleton } from '../../components/ui/Skeleton'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -686,6 +686,17 @@ export default function Reportes() {
             )}
           </div>
 
+          {/* Limit banner */}
+          {!isComparativa && reportData?.length === 500 && (
+            <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
+              <AlertTriangle className="h-4 w-4 text-amber-500 dark:text-amber-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
+              <p className="text-sm text-amber-800 dark:text-amber-300">
+                Se muestran los <strong>500 registros más recientes</strong>. Pueden existir registros adicionales fuera de este rango.
+                Aplica un <strong>filtro de fechas</strong> para acotar los resultados antes de exportar.
+              </p>
+            </div>
+          )}
+
           {/* Table */}
           <div className="card overflow-hidden">
             <div className="px-4 py-3 border-b border-stone-200 dark:border-stone-700 flex items-center gap-2">
@@ -697,11 +708,6 @@ export default function Reportes() {
               <p className="text-sm font-medium text-stone-700 dark:text-stone-200">
                 {isComparativa ? 'Ranking de galpones' : 'Resultados'}
               </p>
-              {!isComparativa && reportData?.length === 500 && (
-                <span className="ml-auto text-xs text-amber-600 dark:text-amber-400 font-medium">
-                  Límite de 500 — aplica filtros de fecha para acotar
-                </span>
-              )}
             </div>
             <div className="overflow-x-auto">
               {isComparativa

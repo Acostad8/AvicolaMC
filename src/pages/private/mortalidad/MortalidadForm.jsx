@@ -18,6 +18,7 @@ import {
   Clock, AlertTriangle, Skull, Building2, Layers,
   CheckCircle2, AlertCircle, TrendingDown, Bird,
 } from 'lucide-react'
+import { useAlertasUmbrales } from '../../../hooks/useAlertasUmbrales'
 
 const schema = z.object({
   fecha:          z.string().min(1, 'Requerido'),
@@ -164,6 +165,8 @@ export default function MortalidadForm() {
   const navigate = useNavigate()
   const { isAdmin, perfil } = useAuth()
   const qc = useQueryClient()
+
+  const { checkMortalidad } = useAlertasUmbrales()
 
   const { register, handleSubmit, watch, reset, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
@@ -312,7 +315,15 @@ export default function MortalidadForm() {
         await supabase.from('lotes').update({ cantidad_aves_actuales: nuevaCantidad }).eq('id', loteActivo.id)
       }
     },
-    onSuccess: () => {
+    onSuccess: (_, values) => {
+      if (!isEdit && loteActivo) {
+        checkMortalidad({
+          cantidadBajas: Number(values.cantidad_bajas),
+          avesAntes:     loteActivo.cantidad_aves_actuales,
+          galponNombre:  previewGalponNombre || '',
+          loteNombre:    loteActivo.nombre_numero || '',
+        })
+      }
       qc.invalidateQueries(['mortalidad'])
       qc.invalidateQueries(['mortalidad-detalle', id])
       qc.invalidateQueries(['lotes'])

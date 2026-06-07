@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 import {
   ComposedChart, Area, Line, BarChart, Bar,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine,
 } from 'recharts'
 import { Skeleton } from '../../components/ui/Skeleton'
 import { format, subDays } from 'date-fns'
@@ -270,6 +270,227 @@ function AlertBanner({ alertas, noMotion }) {
   )
 }
 
+/* ── Mortalidad acumulada por lote ── */
+function MortalidadLotePanel({ lotesConMort, noMotion }) {
+  if (!lotesConMort?.length) return null
+  return (
+    <div className="card p-5">
+      <div className="flex items-center gap-2.5 mb-5">
+        <div className="w-8 h-8 bg-gradient-to-br from-red-400 to-red-600 rounded-lg flex items-center justify-center shadow-sm">
+          <Skull className="h-4 w-4 text-white" aria-hidden="true" />
+        </div>
+        <div>
+          <h2 className="section-title leading-none">Mortalidad acumulada por lote</h2>
+          <p className="text-[11px] text-stone-400 dark:text-stone-500 mt-0.5">Histórico del ciclo · bajas últimos 14 días</p>
+        </div>
+      </div>
+      <div className="space-y-3">
+        {lotesConMort.map((lote, i) => {
+          const pct       = lote.pctAcumulado
+          const barColor  = pct >= 10 ? 'bg-red-500' : pct >= 5 ? 'bg-amber-500' : 'bg-green-500'
+          const textColor = pct >= 10
+            ? 'text-red-600 dark:text-red-400'
+            : pct >= 5 ? 'text-amber-600 dark:text-amber-400'
+            : 'text-green-600 dark:text-green-400'
+          const bgColor   = pct >= 10
+            ? 'bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/30'
+            : pct >= 5 ? 'bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30'
+            : 'bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30'
+          const barWidth  = Math.min((pct / 20) * 100, 100)
+          return (
+            <div
+              key={lote.id}
+              className={`rounded-xl px-3 py-2.5 ${bgColor}`}
+              style={noMotion ? undefined : { animation: 'fadeInUp 0.4s ease-out both', animationDelay: `${60 + i * 50}ms` }}
+            >
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-stone-800 dark:text-stone-100 truncate">{lote.nombre_numero}</p>
+                  <p className="text-[10px] text-stone-500 dark:text-stone-400 truncate">{lote.galpon?.nombre}</p>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <p className={`text-sm font-bold tabular-nums leading-none ${textColor}`}>{pct.toFixed(2)}%</p>
+                  <p className="text-[10px] text-stone-400 dark:text-stone-500 mt-0.5 tabular-nums">
+                    {lote.bajasAcumuladas.toLocaleString('es-CO')} bajas totales
+                  </p>
+                </div>
+              </div>
+              <div className="h-2 bg-white/60 dark:bg-stone-800/60 rounded-full overflow-hidden mb-1.5">
+                <div className={`h-full rounded-full transition-all duration-700 ${barColor}`} style={{ width: `${barWidth}%` }} />
+              </div>
+              <div className="flex items-center justify-between text-[10px] text-stone-500 dark:text-stone-400">
+                <span className="tabular-nums">{formatNumber(lote.cantidad_inicial_aves)} iniciales → {formatNumber(lote.cantidad_aves_actuales)} actuales</span>
+                <span className={`font-semibold ${lote.bajas14d > 0 ? textColor : ''}`}>
+                  {lote.bajas14d > 0 ? `${lote.bajas14d.toLocaleString('es-CO')} en 14d` : 'Sin bajas recientes'}
+                </span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/* ── Inventario semáforo ── */
+function InsumosSemaforoPanel({ insumos, noMotion }) {
+  if (!insumos?.length) return null
+  const sorted   = [...insumos].sort((a, b) => {
+    const nivel = i => i.stock_actual <= i.stock_minimo ? 0 : (i.stock_minimo > 0 && i.stock_actual <= i.stock_minimo * 1.5) ? 1 : 2
+    return nivel(a) - nivel(b)
+  })
+  const criticos = sorted.filter(i => i.stock_actual <= i.stock_minimo).length
+  const proximos = sorted.filter(i => i.stock_actual > i.stock_minimo && i.stock_minimo > 0 && i.stock_actual <= i.stock_minimo * 1.5).length
+
+  return (
+    <div className="card p-5">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-lg flex items-center justify-center shadow-sm">
+            <Package className="h-4 w-4 text-white" aria-hidden="true" />
+          </div>
+          <div>
+            <h2 className="section-title leading-none">Inventario</h2>
+            <p className="text-[11px] text-stone-400 dark:text-stone-500 mt-0.5">Semáforo de stock</p>
+          </div>
+        </div>
+        <Link to="/dashboard/insumos" className="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium flex items-center gap-1">
+          Ver todo <ChevronRight className="h-3 w-3" />
+        </Link>
+      </div>
+
+      {(criticos > 0 || proximos > 0) && (
+        <div className="flex flex-wrap gap-2 mb-3">
+          {criticos > 0 && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/40 rounded-lg">
+              <div className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
+              <span className="text-xs text-red-700 dark:text-red-400 font-semibold">{criticos} crítico{criticos !== 1 ? 's' : ''}</span>
+            </div>
+          )}
+          {proximos > 0 && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-lg">
+              <div className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
+              <span className="text-xs text-amber-700 dark:text-amber-400 font-semibold">{proximos} próximo{proximos !== 1 ? 's' : ''}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="space-y-1.5">
+        {sorted.slice(0, 8).map((ins, i) => {
+          const isCritico = ins.stock_actual <= ins.stock_minimo
+          const isProximo = !isCritico && ins.stock_minimo > 0 && ins.stock_actual <= ins.stock_minimo * 1.5
+          const dotColor  = isCritico ? 'bg-red-500' : isProximo ? 'bg-amber-500' : 'bg-green-500'
+          const barColor  = isCritico ? 'bg-red-500 dark:bg-red-400' : isProximo ? 'bg-amber-500 dark:bg-amber-400' : 'bg-green-500 dark:bg-green-400'
+          const ref       = Math.max(ins.stock_minimo > 0 ? ins.stock_minimo * 3 : 1, ins.stock_actual, 1)
+          const pctBar    = Math.min((ins.stock_actual / ref) * 100, 100)
+          return (
+            <div
+              key={ins.nombre}
+              className="flex items-center gap-2.5 py-1.5 border-b border-stone-100 dark:border-stone-800 last:border-0"
+              style={noMotion ? undefined : { animation: 'fadeInUp 0.4s ease-out both', animationDelay: `${50 + i * 35}ms` }}
+            >
+              <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${dotColor}`} />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-stone-700 dark:text-stone-300 truncate leading-tight">{ins.nombre}</p>
+                <div className="h-1 bg-stone-100 dark:bg-stone-700 rounded-full overflow-hidden mt-1">
+                  <div className={`h-full rounded-full transition-all duration-700 ${barColor}`} style={{ width: `${pctBar}%` }} />
+                </div>
+              </div>
+              <div className="text-right flex-shrink-0 min-w-[40px]">
+                <p className="text-xs font-semibold text-stone-600 dark:text-stone-400 tabular-nums leading-tight">{ins.stock_actual}</p>
+                {ins.stock_minimo > 0 && (
+                  <p className="text-[10px] text-stone-400 dark:text-stone-500 tabular-nums">mín {ins.stock_minimo}</p>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/* ── Mini analytics bar ── */
+function AnalyticsBar({ kpis, posturaConfig, noMotion }) {
+  const umbralMort  = posturaConfig?.alerta_mortalidad ?? 5
+  const mortOk      = parseFloat(kpis?.mortPct14d ?? 0) < umbralMort
+  const pesoHuevoKg = (posturaConfig?.peso_promedio_huevo_g ?? 60) / 1000
+  const fcr14d      = (kpis?.totalAlimento14d > 0 && kpis?.totalHuevos14d > 0)
+    ? (kpis.totalAlimento14d / (kpis.totalHuevos14d * pesoHuevoKg)).toFixed(2)
+    : null
+  const fcrOk = fcr14d != null ? parseFloat(fcr14d) <= 2.5 : null
+  const fcrWarn = fcr14d != null ? parseFloat(fcr14d) <= 3.0 : null
+
+  return (
+    <div
+      className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3"
+      style={noMotion ? undefined : { animation: 'fadeInUp 0.5s ease-out both', animationDelay: '340ms' }}
+    >
+      {[
+        {
+          label: 'Bajas (14d)',
+          value: formatNumber(kpis?.bajasTotal14d ?? 0),
+          sub: 'acumuladas',
+          dot: null,
+          icon: Skull,
+          gradient: 'from-red-400 to-red-600',
+        },
+        {
+          label: 'Mort. (14d)',
+          value: `${kpis?.mortPct14d ?? '0.00'}%`,
+          sub: mortOk ? 'Dentro del umbral' : `Umbral: ${umbralMort}%`,
+          dot: mortOk ? 'bg-green-500' : 'bg-red-500',
+          icon: Activity,
+          gradient: mortOk ? 'from-green-400 to-green-600' : 'from-red-400 to-red-600',
+        },
+        {
+          label: 'Postura media 14d',
+          value: `${kpis?.posturaMedia14d ?? '0.0'}%`,
+          sub: `Obj: ${posturaConfig?.postura_excelente ?? 90}%`,
+          dot: parseFloat(kpis?.posturaMedia14d ?? 0) >= (posturaConfig?.postura_excelente ?? 90)
+            ? 'bg-green-500'
+            : parseFloat(kpis?.posturaMedia14d ?? 0) >= (posturaConfig?.postura_buena ?? 75)
+            ? 'bg-amber-500'
+            : 'bg-red-500',
+          icon: TrendingUp,
+          gradient: 'from-violet-400 to-violet-600',
+        },
+        {
+          label: 'Supervivencia',
+          value: `${kpis?.supervivenciaMedia ?? '100.0'}%`,
+          sub: 'promedio lotes activos',
+          dot: parseFloat(kpis?.supervivenciaMedia ?? 100) >= 95 ? 'bg-green-500' : parseFloat(kpis?.supervivenciaMedia ?? 100) >= 85 ? 'bg-amber-500' : 'bg-red-500',
+          icon: Bird,
+          gradient: 'from-emerald-400 to-emerald-600',
+        },
+        {
+          label: 'FCR (14d)',
+          value: fcr14d ?? '—',
+          sub: fcr14d ? (fcrOk ? 'Óptimo (≤ 2.5)' : fcrWarn ? 'Aceptable (≤ 3.0)' : 'Alto (> 3.0)') : 'Sin datos de alimento',
+          dot: fcr14d ? (fcrOk ? 'bg-green-500' : fcrWarn ? 'bg-amber-500' : 'bg-red-500') : null,
+          icon: Zap,
+          gradient: fcrOk ? 'from-teal-400 to-teal-600' : fcrWarn ? 'from-amber-400 to-amber-600' : fcr14d ? 'from-red-400 to-red-600' : 'from-stone-400 to-stone-600',
+        },
+      ].map(({ label, value, sub, dot, icon: Icon, gradient }) => (
+        <div key={label} className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl p-3 flex items-center gap-3">
+          <div className={`w-9 h-9 bg-gradient-to-br ${gradient} rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm`}>
+            <Icon className="h-4 w-4 text-white" aria-hidden="true" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] text-stone-400 dark:text-stone-500 uppercase tracking-wide leading-tight">{label}</p>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              {dot && <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${dot}`} />}
+              <p className="text-sm font-bold text-stone-800 dark:text-stone-100 tabular-nums">{value}</p>
+            </div>
+            {sub && <p className="text-[10px] text-stone-400 dark:text-stone-500">{sub}</p>}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 /* ══════════════════════════════════════════════════
    DASHBOARD PRINCIPAL
 ══════════════════════════════════════════════════ */
@@ -311,8 +532,9 @@ export default function Dashboard() {
 
       if (galponIds.length === 0) {
         return {
-          kpis: { galpones: 0, lotes: 0, aves: 0, huevosHoy: 0, huevosAyer: 0, bajasHoy: 0, bajasAyer: 0, postura: '0.0', posturaAyer: '0.0', semanaHuevos: 0 },
+          kpis: { galpones: 0, lotes: 0, aves: 0, huevosHoy: 0, huevosAyer: 0, bajasHoy: 0, bajasAyer: 0, postura: '0.0', posturaAyer: '0.0', semanaHuevos: 0, bajasTotal14d: 0, mortPct14d: '0.00', posturaMedia14d: '0.0', supervivenciaMedia: '100.0' },
           chartData: [], loteHealth: [], recientes: [], alertas: [],
+          mortalidadPorLote: [], insumos: [],
         }
       }
 
@@ -353,11 +575,11 @@ export default function Dashboard() {
           .in('galpon_id', galponIds).eq('fecha', ayer),
 
         supabase.from('produccion')
-          .select('fecha, huevos_producidos, porcentaje_postura')
+          .select('fecha, huevos_producidos, porcentaje_postura, consumo_alimento_kg')
           .in('galpon_id', galponIds).gte('fecha', desde14).order('fecha'),
 
         supabase.from('mortalidad')
-          .select('fecha, cantidad_bajas')
+          .select('fecha, cantidad_bajas, lote_id')
           .in('galpon_id', galponIds).gte('fecha', desde14),
 
         supabase.from('produccion')
@@ -405,7 +627,33 @@ export default function Dashboard() {
         return { ...lote, posturaHoy }
       })
 
-      /* 6. Alertas */
+      /* 6. Analítica avanzada */
+      const mortalidadPorLote = (lotes || []).map(lote => {
+        const bajas14d        = (mort14d || []).filter(m => m.lote_id === lote.id).reduce((s, m) => s + (m.cantidad_bajas || 0), 0)
+        const bajasAcumuladas = Math.max(0, (lote.cantidad_inicial_aves || 0) - (lote.cantidad_aves_actuales || 0))
+        const pctAcumulado    = (lote.cantidad_inicial_aves || 0) > 0
+          ? (bajasAcumuladas / lote.cantidad_inicial_aves) * 100
+          : 0
+        return { ...lote, bajasAcumuladas, pctAcumulado, bajas14d }
+      }).sort((a, b) => b.pctAcumulado - a.pctAcumulado)
+
+      const bajasTotal14d = (mort14d || []).reduce((s, m) => s + (m.cantidad_bajas || 0), 0)
+      const mortPct14d    = aves > 0 ? ((bajasTotal14d / aves) * 100).toFixed(2) : '0.00'
+
+      const posturaMedia14d = (() => {
+        const registros = (prod14d || []).filter(p => parseFloat(p.porcentaje_postura) > 0)
+        if (!registros.length) return '0.0'
+        return (registros.reduce((s, p) => s + parseFloat(p.porcentaje_postura), 0) / registros.length).toFixed(1)
+      })()
+
+      const supervivenciaMedia = (() => {
+        const activos = (lotes || []).filter(l => (l.cantidad_inicial_aves || 0) > 0)
+        if (!activos.length) return '100.0'
+        const prom = activos.reduce((s, l) => s + (l.cantidad_aves_actuales / l.cantidad_inicial_aves) * 100, 0) / activos.length
+        return prom.toFixed(1)
+      })()
+
+      /* 7. Alertas */
       const alertas = []
       const conProdHoy = new Set((prodHoy || []).map(p => p.galpon_id))
       for (const g of (galpones || [])) {
@@ -417,17 +665,22 @@ export default function Dashboard() {
           alertas.push({ type: 'stock', msg: `Stock bajo: "${ins.nombre}" (${ins.stock_actual} unidades)` })
       }
 
+      const totalAlimento14d = (prod14d || []).reduce((s, p) => s + (p.consumo_alimento_kg || 0), 0)
+      const totalHuevos14d   = (prod14d || []).reduce((s, p) => s + (p.huevos_producidos  || 0), 0)
+
       return {
-        kpis: { galpones: galponIds.length, lotes: (lotes || []).length, aves, huevosHoy, huevosAyer, bajasHoy, bajasAyer, postura, posturaAyer, semanaHuevos },
+        kpis: { galpones: galponIds.length, lotes: (lotes || []).length, aves, huevosHoy, huevosAyer, bajasHoy, bajasAyer, postura, posturaAyer, semanaHuevos, bajasTotal14d, mortPct14d, posturaMedia14d, supervivenciaMedia, totalAlimento14d, totalHuevos14d },
         chartData,
         loteHealth,
         recientes: recientes || [],
         alertas,
+        mortalidadPorLote,
+        insumos: insumosRes.data || [],
       }
     },
   })
 
-  const { kpis, chartData, loteHealth, recientes, alertas } = data || {}
+  const { kpis, chartData, loteHealth, recientes, alertas, mortalidadPorLote, insumos } = data || {}
 
   /* ── Loading skeleton ── */
   if (isLoading) return (
@@ -519,6 +772,9 @@ export default function Dashboard() {
         <KpiCard noMotion={noMotion} delay={310} label="Huevos esta semana" rawValue={kpis?.semanaHuevos}   value={formatNumber(kpis?.semanaHuevos)}  icon={Star}       gradient="from-rose-400 to-rose-600"     sub="últimos 7 días" />
       </div>
 
+      {/* ══ ANALYTICS BAR ══════════════════════════════════════ */}
+      <AnalyticsBar kpis={kpis} posturaConfig={posturaConfig} noMotion={noMotion} />
+
       {/* ══ ALERTAS ══════════════════════════════════════════════ */}
       {alertas?.length > 0 && <AlertBanner alertas={alertas} noMotion={noMotion} />}
 
@@ -555,6 +811,15 @@ export default function Dashboard() {
                 <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} formatter={v => <span style={{ color: axisColor }}>{v}</span>} />
                 <Area yAxisId="left"  type="monotone" dataKey="huevos"  stroke="#d97706" strokeWidth={2.5} fill="url(#gradHuevos)" dot={false} activeDot={{ r: 5, fill: '#d97706' }} name="Huevos" />
                 <Line yAxisId="right" type="monotone" dataKey="postura" stroke="#22c55e" strokeWidth={2}   dot={false} activeDot={{ r: 4, fill: '#22c55e' }} name="% Postura" strokeDasharray="4 2" />
+                <ReferenceLine
+                  yAxisId="right"
+                  y={posturaConfig?.postura_excelente ?? 90}
+                  stroke="#22c55e"
+                  strokeDasharray="8 4"
+                  strokeWidth={1}
+                  strokeOpacity={0.5}
+                  label={{ value: `Obj ${posturaConfig?.postura_excelente ?? 90}%`, position: 'insideTopRight', fontSize: 9, fill: '#22c55e', opacity: 0.8 }}
+                />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -615,6 +880,13 @@ export default function Dashboard() {
               </div>
             </div>
           )}
+
+          {/* Mortalidad acumulada por lote */}
+          {mortalidadPorLote && mortalidadPorLote.length > 0 && (
+            <div style={anim(620)}>
+              <MortalidadLotePanel lotesConMort={mortalidadPorLote} noMotion={noMotion} />
+            </div>
+          )}
         </div>
 
         {/* ── Columna derecha (1/3) ────────────────────────────── */}
@@ -649,6 +921,13 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+
+          {/* Inventario semáforo (solo admin) */}
+          {isAdmin && insumos && insumos.length > 0 && (
+            <div style={anim(415)}>
+              <InsumosSemaforoPanel insumos={insumos} noMotion={noMotion} />
+            </div>
+          )}
 
           {/* Actividad reciente */}
           <div className="card p-5" style={anim(410)}>

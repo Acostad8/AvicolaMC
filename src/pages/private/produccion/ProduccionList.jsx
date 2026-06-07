@@ -77,6 +77,7 @@ function FilterChip({ label, onRemove }) {
 export default function ProduccionList() {
   const { isAdmin, perfil } = useAuth()
   const { dark } = useA11y()
+  const { config } = useConfig()
 
   const [filterGalpon, setFilterGalpon] = useState('')
   const [filterRaza, setFilterRaza]     = useState('')   // stores raza UUID
@@ -190,10 +191,13 @@ export default function ProduccionList() {
     const avgPostura    = filteredData.reduce((s, r) => s + (r.porcentaje_postura || 0), 0) / filteredData.length
     const avgDiario     = totalHuevos / filteredData.length
     const mejorDia      = filteredData.reduce((b, r) => r.huevos_producidos > (b?.huevos_producidos || 0) ? r : b, null)
-    const eficiencia    = totalAlimento > 0 ? (totalHuevos / totalAlimento).toFixed(2) : '—'
+    const pesoHuevoKg   = (config.produccion?.peso_promedio_huevo_g ?? 60) / 1000
+    const fcr           = (totalAlimento > 0 && totalHuevos > 0)
+      ? (totalAlimento / (totalHuevos * pesoHuevoKg)).toFixed(2)
+      : '—'
 
-    return { totalHuevos, totalAlimento, avgPostura, avgDiario, mejorDia, eficiencia, dias: filteredData.length }
-  }, [filteredData])
+    return { totalHuevos, totalAlimento, avgPostura, avgDiario, mejorDia, fcr, dias: filteredData.length }
+  }, [filteredData, config.produccion?.peso_promedio_huevo_g])
 
   /* Chart data: sorted ascending, last 30 records */
   const chartData = useMemo(() =>
@@ -262,7 +266,7 @@ export default function ProduccionList() {
         <KpiCard loading={isLoading} icon={TrendingUp}  gradient="from-green-400 to-green-600"   label="Promedio diario"   value={kpis ? formatNumber(Math.round(kpis.avgDiario)) : '—'} sub="huevos/día" />
         <KpiCard loading={isLoading} icon={BarChart2}   gradient="from-blue-400 to-blue-600"     label="% Postura prom."   value={kpis ? `${kpis.avgPostura.toFixed(1)}%`  : '—'} sub="del período" />
         <KpiCard loading={isLoading} icon={Wheat}       gradient="from-orange-400 to-orange-600" label="Alimento total"    value={kpis ? `${kpis.totalAlimento.toFixed(1)} kg` : '—'} sub="consumido" />
-        <KpiCard loading={isLoading} icon={TrendingUp}  gradient="from-purple-400 to-purple-600" label="Eficiencia"        value={kpis?.eficiencia ?? '—'} sub="huevos/kg" />
+        <KpiCard loading={isLoading} icon={TrendingUp}  gradient="from-purple-400 to-purple-600" label="FCR"               value={kpis?.fcr ?? '—'} sub="kg alim / kg prod" />
         <KpiCard loading={isLoading} icon={Calendar}    gradient="from-rose-400 to-rose-600"     label="Mejor día"         value={kpis?.mejorDia ? formatNumber(kpis.mejorDia.huevos_producidos) : '—'} sub={kpis?.mejorDia ? formatDate(kpis.mejorDia.fecha) : undefined} />
       </div>
 

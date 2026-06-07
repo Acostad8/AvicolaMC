@@ -8,7 +8,7 @@ import {
   Contrast, CheckCircle2, TrendingUp, AlertCircle,
   Phone, Mail, MapPin, Hash, Info,
   Bell, BellOff, BellRing, Trash2,
-  ShieldCheck, Package, Activity, CalendarClock,
+  ShieldCheck, Package, Activity, CalendarClock, Scale,
 } from 'lucide-react'
 import PageHeader from '../../../components/ui/PageHeader'
 import Button from '../../../components/ui/Button'
@@ -41,10 +41,12 @@ const empresaSchema = z.object({
 
 /* ── Schema producción ── */
 const produccionSchema = z.object({
-  postura_excelente:  z.coerce.number().int().min(1).max(100),
-  postura_buena:      z.coerce.number().int().min(1).max(100),
-  postura_regular:    z.coerce.number().int().min(1).max(100),
-  alerta_mortalidad:  z.coerce.number().min(0).max(100),
+  postura_excelente:       z.coerce.number().int().min(1).max(100),
+  postura_buena:           z.coerce.number().int().min(1).max(100),
+  postura_regular:         z.coerce.number().int().min(1).max(100),
+  alerta_mortalidad:       z.coerce.number().min(0).max(100),
+  umbral_dias_tratamiento: z.coerce.number().int().min(1).max(365),
+  peso_promedio_huevo_g:   z.coerce.number().min(30).max(120),
 }).refine(d => d.postura_excelente > d.postura_buena, {
   message: 'Excelente debe ser mayor que Buena',
   path: ['postura_excelente'],
@@ -228,10 +230,12 @@ function TabProduccion() {
 
   function onSubmit(values) {
     saveSection('produccion', {
-      postura_excelente:  Number(values.postura_excelente),
-      postura_buena:      Number(values.postura_buena),
-      postura_regular:    Number(values.postura_regular),
-      alerta_mortalidad:  Number(values.alerta_mortalidad),
+      postura_excelente:       Number(values.postura_excelente),
+      postura_buena:           Number(values.postura_buena),
+      postura_regular:         Number(values.postura_regular),
+      alerta_mortalidad:       Number(values.alerta_mortalidad),
+      umbral_dias_tratamiento: Number(values.umbral_dias_tratamiento),
+      peso_promedio_huevo_g:   Number(values.peso_promedio_huevo_g),
     })
     toast.success('Umbrales de producción guardados')
   }
@@ -313,6 +317,53 @@ function TabProduccion() {
             step="0.1"
             error={errors.alerta_mortalidad?.message}
             {...register('alerta_mortalidad')}
+          />
+        </div>
+      </div>
+
+      {/* Umbral tratamientos prolongados */}
+      <div>
+        <div className="flex items-center gap-3 pb-4 border-b border-stone-100 dark:border-stone-800 mb-4">
+          <div className="w-10 h-10 bg-gradient-to-br from-violet-400 to-violet-600 rounded-xl flex items-center justify-center shadow-sm">
+            <CalendarClock className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <p className="font-semibold text-stone-800 dark:text-stone-100 text-sm">Tratamientos prolongados</p>
+            <p className="text-xs text-stone-400 dark:text-stone-500">Días sin completar que activa una alerta de recordatorio</p>
+          </div>
+        </div>
+        <div className="sm:w-64">
+          <Input
+            label="Umbral en días (1 – 365)"
+            type="number"
+            min="1"
+            max="365"
+            error={errors.umbral_dias_tratamiento?.message}
+            {...register('umbral_dias_tratamiento')}
+          />
+        </div>
+      </div>
+
+      {/* Peso promedio del huevo (FCR) */}
+      <div>
+        <div className="flex items-center gap-3 pb-4 border-b border-stone-100 dark:border-stone-800 mb-4">
+          <div className="w-10 h-10 bg-gradient-to-br from-teal-400 to-teal-600 rounded-xl flex items-center justify-center shadow-sm">
+            <Scale className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <p className="font-semibold text-stone-800 dark:text-stone-100 text-sm">Peso promedio del huevo</p>
+            <p className="text-xs text-stone-400 dark:text-stone-500">Usado para calcular el FCR (Índice de Conversión Alimenticia) · FCR = kg alimento / kg huevos</p>
+          </div>
+        </div>
+        <div className="sm:w-64">
+          <Input
+            label="Peso del huevo en gramos (30 – 120)"
+            type="number"
+            min="30"
+            max="120"
+            step="1"
+            error={errors.peso_promedio_huevo_g?.message}
+            {...register('peso_promedio_huevo_g')}
           />
         </div>
       </div>

@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Header from './Header'
 import { useAuth } from '../../context/AuthContext'
 import { useIdleTimeout } from '../../hooks/useIdleTimeout'
 import { IdleWarningModal } from '../ui/IdleWarningModal'
+import { useAlertasUmbrales } from '../../hooks/useAlertasUmbrales'
+import ChatBot from '../ui/ChatBot'
 
 const routeTitles = {
   '/dashboard': 'Dashboard',
@@ -35,6 +37,13 @@ export default function PrivateLayout() {
   const location  = useLocation()
   const title     = getTitle(location.pathname)
   const { signOut } = useAuth()
+  const { checkTratamientosLargos } = useAlertasUmbrales()
+
+  useEffect(() => {
+    checkTratamientosLargos()
+  // Solo al montar — no repetir aunque cambie checkTratamientosLargos
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const { isWarning, countdown, warningSeconds, resetTimer } = useIdleTimeout({
     timeoutMs: 30 * 60 * 1000,
@@ -59,6 +68,8 @@ export default function PrivateLayout() {
         onStay={resetTimer}
         onLogout={signOut}
       />
+
+      <ChatBot />
     </div>
   )
 }

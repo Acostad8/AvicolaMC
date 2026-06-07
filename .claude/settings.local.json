@@ -38,7 +38,10 @@
       "Bash(npx --yes tsc --noEmit)",
       "mcp__claude_ai_Supabase__list_migrations",
       "Read(//c/Users/USUARIO/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/381746f1-18cb-420e-883f-b1b79917d698/3b62c02d-2879-4381-b8e6-a04d481e8531/skills/docx/**)",
-      "Bash(extract-text \"C:\\\\Users\\\\USUARIO\\\\Documents\\\\Historias de Usuario TABLAS.docx\")"
+      "Bash(extract-text \"C:\\\\Users\\\\USUARIO\\\\Documents\\\\Historias de Usuario TABLAS.docx\")",
+      "Bash(timeout 5)",
+      "Bash(supabase *)",
+      "mcp__claude_ai_Supabase__get_logs"
     ]
   }
 }
