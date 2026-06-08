@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -475,12 +475,17 @@ export default function TratamientoForm() {
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries(['tratamientos'])
-      qc.invalidateQueries(['insumos'])
-      qc.invalidateQueries(['insumos-activos'])
-      qc.invalidateQueries(['insumos-tratamientos'])
+      qc.invalidateQueries({ queryKey: ['tratamientos'] })
+      qc.invalidateQueries({ queryKey: ['tratamiento', id] })
+      qc.invalidateQueries({ queryKey: ['auditoria-tratamiento', id] })
+      qc.invalidateQueries({ queryKey: ['insumos'] })
+      qc.invalidateQueries({ queryKey: ['insumos-activos'] })
+      qc.invalidateQueries({ queryKey: ['insumos-tratamientos'] })
+      if (tratamiento?.insumo_id) {
+        qc.invalidateQueries({ queryKey: ['movimientos-insumo', tratamiento.insumo_id] })
+      }
       toast.success(isEdit ? 'Tratamiento actualizado' : 'Tratamiento registrado')
-      navigate('/dashboard/tratamientos')
+      navigate(isEdit ? `/dashboard/tratamientos/${id}` : '/dashboard/tratamientos')
     },
     onError: e => toast.error(e.message || 'Error al guardar'),
   })

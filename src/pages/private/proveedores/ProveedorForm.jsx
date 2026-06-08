@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -294,7 +294,7 @@ export default function ProveedorForm() {
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries(['proveedores'])
+      qc.invalidateQueries({ queryKey: ['proveedores'] })
       toast.success(isEdit ? 'Proveedor actualizado' : 'Proveedor registrado')
       navigate('/dashboard/proveedores')
     },

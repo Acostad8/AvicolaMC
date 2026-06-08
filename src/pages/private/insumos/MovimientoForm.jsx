@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+﻿import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -170,10 +170,9 @@ function PreviewCard({ tipo, insumo, cantidad, destino, fecha, isAdmin, sinStock
 }
 
 export default function MovimientoForm() {
-  const navigate   = useNavigate()
-  const { perfil } = useAuth()
-  const qc         = useQueryClient()
-  const isAdmin    = perfil?.rol === 'administrador'
+  const navigate            = useNavigate()
+  const { perfil, isAdmin } = useAuth()
+  const qc                  = useQueryClient()
   const { checkStockMinimo } = useAlertasUmbrales()
 
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm({
@@ -255,8 +254,8 @@ export default function MovimientoForm() {
           unidad:       insumoSeleccionado.unidad_medida,
         })
       }
-      qc.invalidateQueries(['insumos'])
-      qc.invalidateQueries(['movimientos-insumo'])
+      qc.invalidateQueries({ queryKey: ['insumos'] })
+      qc.invalidateQueries({ queryKey: ['movimientos-insumo'] })
       toast.success('Movimiento registrado correctamente')
       navigate('/dashboard/insumos')
     },

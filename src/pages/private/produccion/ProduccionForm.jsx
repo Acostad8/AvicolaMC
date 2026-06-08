@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+﻿import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../context/AuthContext'
 import { calcPostura } from '../../../lib/utils'
+import { useConfig } from '../../../context/ConfigContext'
 import Input from '../../../components/ui/Input'
 import Select from '../../../components/ui/Select'
 import Textarea from '../../../components/ui/Textarea'
@@ -66,10 +67,12 @@ function FormSection({ icon: Icon, title, gradient, children }) {
 
 /* ── Gauge de postura ── */
 function PosturaGauge({ value }) {
+  const { config } = useConfig()
   if (value === null) return null
-  const color = value >= 90 ? 'text-emerald-500' : value >= 75 ? 'text-amber-500' : 'text-red-500'
-  const bar   = value >= 90 ? 'bg-emerald-500' : value >= 75 ? 'bg-amber-500' : 'bg-red-500'
-  const label = value >= 90 ? 'Excelente' : value >= 75 ? 'Buena' : 'Baja'
+  const { postura_excelente: exc, postura_buena: bue } = config.produccion
+  const color = value >= exc ? 'text-emerald-500' : value >= bue ? 'text-amber-500' : 'text-red-500'
+  const bar   = value >= exc ? 'bg-emerald-500' : value >= bue ? 'bg-amber-500' : 'bg-red-500'
+  const label = value >= exc ? 'Excelente' : value >= bue ? 'Buena' : 'Baja'
   const pct   = Math.min(value, 100)
 
   return (
@@ -86,7 +89,7 @@ function PosturaGauge({ value }) {
       </div>
       <div className="flex justify-between text-xs">
         <span className={`font-semibold ${color}`}>{label}</span>
-        <span className="text-stone-400 dark:text-stone-500">meta: 90%</span>
+        <span className="text-stone-400 dark:text-stone-500">meta: {exc}%</span>
       </div>
     </div>
   )
@@ -403,9 +406,9 @@ export default function ProduccionForm() {
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries(['produccion'])
-      qc.invalidateQueries(['produccion-detalle', id])
-      qc.invalidateQueries(['auditoria-produccion', id])
+      qc.invalidateQueries({ queryKey: ['produccion'] })
+      qc.invalidateQueries({ queryKey: ['produccion-detalle', id] })
+      qc.invalidateQueries({ queryKey: ['auditoria-produccion', id] })
       toast.success(isEdit ? 'Registro actualizado correctamente' : 'Producción registrada correctamente')
       navigate(isEdit ? `/dashboard/produccion/${id}` : '/dashboard/produccion')
     },

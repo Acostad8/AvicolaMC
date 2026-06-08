@@ -290,9 +290,11 @@ export default function GalponDetalle() {
             </div>
             <h2 className="section-title">Lote activo</h2>
           </div>
-          <Link to="/dashboard/lotes/nuevo">
-            <Button size="sm" icon={Plus} variant="secondary">Nuevo lote</Button>
-          </Link>
+          {!loteActivo && (
+            <Link to="/dashboard/lotes/nuevo">
+              <Button size="sm" icon={Plus} variant="secondary">Nuevo lote</Button>
+            </Link>
+          )}
         </div>
 
         {loteActivo ? (

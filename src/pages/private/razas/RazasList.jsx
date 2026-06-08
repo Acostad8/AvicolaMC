@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -127,7 +127,7 @@ export default function RazasList({ embedded = false }) {
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries(['razas'])
+      qc.invalidateQueries({ queryKey: ['razas'] })
       toast.success(modal?.id ? 'Raza actualizada correctamente' : 'Raza creada correctamente')
       setModal(null)
       reset()
@@ -141,7 +141,7 @@ export default function RazasList({ embedded = false }) {
       if (error) throw error
     },
     onSuccess: () => {
-      qc.invalidateQueries(['razas'])
+      qc.invalidateQueries({ queryKey: ['razas'] })
       toast.success('Raza eliminada')
       setDeleteRaza(null)
     },

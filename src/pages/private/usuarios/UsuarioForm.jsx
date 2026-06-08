@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+﻿import { useEffect, useState, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -339,8 +339,8 @@ export default function UsuarioForm() {
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries(['usuarios'])
-      qc.invalidateQueries(['galpones'])
+      qc.invalidateQueries({ queryKey: ['usuarios'] })
+      qc.invalidateQueries({ queryKey: ['galpones'] })
       toast.success(isEdit ? 'Usuario actualizado' : 'Usuario creado')
       navigate('/dashboard/usuarios')
     },

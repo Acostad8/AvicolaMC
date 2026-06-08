@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+﻿import { useState, useEffect, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
@@ -6,7 +6,7 @@ import { useAuth } from '../../../context/AuthContext'
 import { useAutoRefreshAtMidnight } from '../../../hooks/useAutoRefreshAtMidnight'
 import { useA11y } from '../../../context/AccessibilityContext'
 import { useConfig } from '../../../context/ConfigContext'
-import { formatDate, formatNumber, calcWeeksAge } from '../../../lib/utils'
+import { formatDate, formatNumber, calcWeeksAge, TIPOS_TRATAMIENTO } from '../../../lib/utils'
 import PageHeader from '../../../components/ui/PageHeader'
 import { StatusBadge } from '../../../components/ui/Badge'
 import Button from '../../../components/ui/Button'
@@ -18,7 +18,12 @@ import {
   CheckCircle, PauseCircle, Layers, Bird, Building2,
   Calendar, TrendingDown, Activity, Clock, AlertTriangle,
   CheckCircle2, Info, Pencil, PlayCircle, Hash,
+  Egg, FlaskConical, Eye,
 } from 'lucide-react'
+import {
+  AreaChart, Area, BarChart, Bar, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+} from 'recharts'
 
 /* ── Animated counter ── */
 function useCountUp(target, enabled) {
@@ -191,11 +196,273 @@ function Detail({ label, value, accent }) {
   )
 }
 
+/* ── Badge de postura (usa umbrales del config) ── */
+function PosturaBadgeLote({ pct, exc, bue, reg }) {
+  const n   = parseFloat(pct) || 0
+  const cls = n >= exc ? 'text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30'
+    : n >= bue ? 'text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30'
+    : n >= reg ? 'text-yellow-700 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30'
+    : 'text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/30'
+  return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${cls}`}>{n.toFixed(1)}%</span>
+}
+
+/* ── Header de sección reutilizable ── */
+function SeccionHeader({ icon: Icon, gradient, title, count }) {
+  return (
+    <div className="flex items-center gap-2 pb-3 border-b border-stone-100 dark:border-stone-800">
+      <div className={`w-7 h-7 bg-gradient-to-br ${gradient} rounded-lg flex items-center justify-center flex-shrink-0`}>
+        <Icon className="h-3.5 w-3.5 text-white" />
+      </div>
+      <h2 className="section-title">{title}</h2>
+      {count !== undefined && (
+        <span className="text-xs text-stone-400 dark:text-stone-500 ml-auto">{count} registros</span>
+      )}
+    </div>
+  )
+}
+
+/* ── Sección: Producción ── */
+function SeccionProduccion({ registros, config, dark }) {
+  const { postura_excelente: exc, postura_buena: bue, postura_regular: reg } = config.produccion
+  const gridColor    = dark ? '#292524' : '#f5f5f4'
+  const axisColor    = dark ? '#78716c' : '#a8a29e'
+  const tooltipStyle = { backgroundColor: dark ? '#1c1917' : '#fff', border: `1px solid ${dark ? '#292524' : '#e7e5e4'}`, borderRadius: '12px', fontSize: '11px', color: dark ? '#f5f5f4' : '#1c1917' }
+
+  const totalHuevos = registros.reduce((s, r) => s + (r.huevos_producidos || 0), 0)
+  const avgDiario   = registros.length > 0 ? Math.round(totalHuevos / registros.length) : 0
+  const mejorDia    = registros.reduce((b, r) => (r.huevos_producidos || 0) > (b?.huevos_producidos || 0) ? r : b, null)
+  const chartData   = [...registros].sort((a, b) => a.fecha.localeCompare(b.fecha)).slice(-30)
+    .map(r => ({ fecha: r.fecha.slice(5), huevos: r.huevos_producidos }))
+  const ultimos = registros.slice(0, 10)
+
+  return (
+    <div className="card p-5 space-y-5">
+      <SeccionHeader icon={Egg} gradient="from-amber-400 to-amber-600" title="Producción del lote" count={registros.length} />
+
+      {registros.length === 0 ? (
+        <p className="text-sm text-stone-400 dark:text-stone-500 text-center py-6">No hay registros de producción para este lote.</p>
+      ) : (
+        <>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: 'Total huevos',  value: formatNumber(totalHuevos) },
+              { label: 'Promedio/día',  value: formatNumber(avgDiario) },
+              { label: 'Mejor día',     value: mejorDia ? formatNumber(mejorDia.huevos_producidos) : '—', sub: mejorDia ? formatDate(mejorDia.fecha) : undefined },
+            ].map(({ label, value, sub }) => (
+              <div key={label} className="bg-stone-50 dark:bg-stone-800/50 rounded-xl p-3 text-center">
+                <p className="text-[10px] text-stone-400 dark:text-stone-500 uppercase tracking-wide">{label}</p>
+                <p className="text-sm font-bold text-stone-800 dark:text-stone-100 tabular-nums mt-1">{value}</p>
+                {sub && <p className="text-[10px] text-stone-400 dark:text-stone-500 mt-0.5">{sub}</p>}
+              </div>
+            ))}
+          </div>
+
+          {chartData.length > 1 && (
+            <div>
+              <p className="text-xs font-medium text-stone-500 dark:text-stone-400 mb-2">Tendencia — últimos {chartData.length} registros</p>
+              <ResponsiveContainer width="100%" height={140}>
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="gradProdLote" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor="#d97706" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#d97706" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
+                  <XAxis dataKey="fecha" tick={{ fontSize: 9, fill: axisColor }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                  <YAxis tick={{ fontSize: 10, fill: axisColor }} axisLine={false} tickLine={false} width={44} />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <Area type="monotone" dataKey="huevos" stroke="#d97706" strokeWidth={2} fill="url(#gradProdLote)" dot={false} activeDot={{ r: 4, fill: '#d97706' }} name="Huevos" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-stone-50 dark:bg-stone-800/50 border-b border-stone-100 dark:border-stone-800">
+                <tr>
+                  {['Fecha', 'Huevos', '% Postura', 'Alimento', ''].map(h => (
+                    <th key={h} className="text-left px-3 py-2 text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-50 dark:divide-stone-800">
+                {ultimos.map(r => (
+                  <tr key={r.id} className="hover:bg-stone-50 dark:hover:bg-stone-800/40 transition-colors">
+                    <td className="px-3 py-2 text-xs text-stone-500 dark:text-stone-400 whitespace-nowrap">{formatDate(r.fecha)}</td>
+                    <td className="px-3 py-2 font-bold text-amber-600 dark:text-amber-400 tabular-nums">{formatNumber(r.huevos_producidos)}</td>
+                    <td className="px-3 py-2">
+                      {r.porcentaje_postura != null
+                        ? <PosturaBadgeLote pct={r.porcentaje_postura} exc={exc} bue={bue} reg={reg} />
+                        : <span className="text-stone-400 dark:text-stone-600">—</span>}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-stone-500 dark:text-stone-400 tabular-nums whitespace-nowrap">
+                      {r.consumo_alimento_kg != null ? `${r.consumo_alimento_kg} kg` : '—'}
+                    </td>
+                    <td className="px-3 py-2">
+                      <Link to={`/dashboard/produccion/${r.id}`} className="text-xs text-primary-600 dark:text-primary-400 hover:underline inline-flex items-center gap-1">
+                        <Eye className="h-3 w-3" />Ver
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {registros.length > 10 && (
+              <p className="text-xs text-stone-400 dark:text-stone-500 text-center py-2 border-t border-stone-50 dark:border-stone-800">
+                Mostrando los 10 más recientes de {registros.length} totales
+              </p>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+/* ── Sección: Tratamientos ── */
+function SeccionTratamientos({ tratamientos }) {
+  return (
+    <div className="card p-5 space-y-4">
+      <SeccionHeader icon={FlaskConical} gradient="from-violet-400 to-violet-600" title="Tratamientos del lote" count={tratamientos.length} />
+
+      {tratamientos.length === 0 ? (
+        <p className="text-sm text-stone-400 dark:text-stone-500 text-center py-6">No hay tratamientos registrados para este lote.</p>
+      ) : (
+        <div className="space-y-2">
+          {tratamientos.map(t => {
+            const tipoLabel = TIPOS_TRATAMIENTO.find(x => x.value === t.tipo)?.label || t.tipo
+            const activo    = t.estado === 'activo'
+            return (
+              <div
+                key={t.id}
+                className={`flex items-center justify-between gap-3 rounded-xl px-4 py-3 border transition-colors ${
+                  activo
+                    ? 'bg-violet-50 dark:bg-violet-950/20 border-violet-200 dark:border-violet-800/50'
+                    : 'bg-stone-50 dark:bg-stone-800/40 border-stone-100 dark:border-stone-800'
+                }`}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-semibold text-stone-800 dark:text-stone-100 leading-tight">{tipoLabel}</p>
+                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                      activo
+                        ? 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-400'
+                        : 'bg-stone-200 dark:bg-stone-700 text-stone-500 dark:text-stone-400'
+                    }`}>
+                      {activo ? 'En curso' : 'Finalizado'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5 truncate">
+                    {t.nombre_producto}{t.responsable && ` · ${t.responsable}`}
+                  </p>
+                  <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">
+                    {formatDate(t.fecha_inicio)}{t.fecha_fin ? ` → ${formatDate(t.fecha_fin)}` : ' → En curso'}
+                  </p>
+                </div>
+                <Link to={`/dashboard/tratamientos/${t.id}`} className="text-xs text-primary-600 dark:text-primary-400 hover:underline inline-flex items-center gap-1 flex-shrink-0">
+                  <Eye className="h-3 w-3" />Ver
+                </Link>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ── Sección: Mortalidad ── */
+function SeccionMortalidad({ registros, config, loteInicial, dark }) {
+  const umbralPct = config.produccion?.alerta_mortalidad ?? 5
+  const umbralAbs = loteInicial > 0 ? Math.ceil(loteInicial * umbralPct / 100) : Infinity
+  const gridColor    = dark ? '#292524' : '#f5f5f4'
+  const axisColor    = dark ? '#78716c' : '#a8a29e'
+  const tooltipStyle = { backgroundColor: dark ? '#1c1917' : '#fff', border: `1px solid ${dark ? '#292524' : '#e7e5e4'}`, borderRadius: '12px', fontSize: '11px', color: dark ? '#f5f5f4' : '#1c1917' }
+
+  const chartData = [...registros].sort((a, b) => a.fecha.localeCompare(b.fecha)).slice(-30)
+    .map(r => ({ fecha: r.fecha.slice(5), bajas: r.cantidad_bajas || 0, supera: (r.cantidad_bajas || 0) >= umbralAbs }))
+  const ultimos = registros.slice(0, 10)
+
+  return (
+    <div className="card p-5 space-y-5">
+      <SeccionHeader icon={TrendingDown} gradient="from-red-400 to-red-600" title="Mortalidad del lote" count={registros.length} />
+
+      {registros.length === 0 ? (
+        <p className="text-sm text-stone-400 dark:text-stone-500 text-center py-6">No hay registros de mortalidad para este lote.</p>
+      ) : (
+        <>
+          {chartData.length > 1 && (
+            <div>
+              <p className="text-xs font-medium text-stone-500 dark:text-stone-400 mb-2">
+                Bajas diarias — últimos {chartData.length} registros · umbral: {umbralAbs} aves/día ({umbralPct}%)
+              </p>
+              <ResponsiveContainer width="100%" height={130}>
+                <BarChart data={chartData} barSize={Math.max(4, Math.floor(260 / chartData.length))}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
+                  <XAxis dataKey="fecha" tick={{ fontSize: 9, fill: axisColor }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                  <YAxis tick={{ fontSize: 10, fill: axisColor }} axisLine={false} tickLine={false} width={28} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={v => [v, 'Bajas']} />
+                  <Bar dataKey="bajas" radius={[3, 3, 0, 0]}>
+                    {chartData.map((entry, i) => (
+                      <Cell key={i} fill={entry.supera ? '#ef4444' : '#10b981'} fillOpacity={0.85} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+              <div className="flex items-center gap-4 mt-1.5">
+                <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded bg-emerald-500 opacity-85" /><span className="text-[10px] text-stone-400 dark:text-stone-500">Normal</span></div>
+                <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded bg-red-500 opacity-85" /><span className="text-[10px] text-stone-400 dark:text-stone-500">Supera umbral ({umbralPct}%)</span></div>
+              </div>
+            </div>
+          )}
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-stone-50 dark:bg-stone-800/50 border-b border-stone-100 dark:border-stone-800">
+                <tr>
+                  {['Fecha', 'Bajas', 'Causa', 'Observaciones'].map(h => (
+                    <th key={h} className="text-left px-3 py-2 text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-50 dark:divide-stone-800">
+                {ultimos.map(r => {
+                  const supera = (r.cantidad_bajas || 0) >= umbralAbs
+                  return (
+                    <tr key={r.id} className={`transition-colors ${supera ? 'bg-red-50/60 dark:bg-red-950/10' : 'hover:bg-stone-50 dark:hover:bg-stone-800/40'}`}>
+                      <td className="px-3 py-2 text-xs text-stone-500 dark:text-stone-400 whitespace-nowrap">{formatDate(r.fecha)}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <span className={`font-bold tabular-nums ${supera ? 'text-red-600 dark:text-red-400' : 'text-stone-800 dark:text-stone-100'}`}>
+                          {r.cantidad_bajas}
+                        </span>
+                        {supera && <span className="ml-1.5 text-[10px] font-semibold text-red-500">▲ umbral</span>}
+                      </td>
+                      <td className="px-3 py-2 text-xs text-stone-600 dark:text-stone-400">{r.causa || '—'}</td>
+                      <td className="px-3 py-2 text-xs text-stone-400 dark:text-stone-500 max-w-[160px] truncate">{r.observaciones || '—'}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            {registros.length > 10 && (
+              <p className="text-xs text-stone-400 dark:text-stone-500 text-center py-2 border-t border-stone-50 dark:border-stone-800">
+                Mostrando los 10 más recientes de {registros.length} totales
+              </p>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function LoteDetalle() {
   useAutoRefreshAtMidnight()
   const { id }     = useParams()
   const { isAdmin } = useAuth()
-  const { noMotion } = useA11y()
+  const { noMotion, dark } = useA11y()
   const { config } = useConfig()
   const qc         = useQueryClient()
   const [confirmAction, setConfirmAction] = useState(null)
@@ -211,11 +478,36 @@ export default function LoteDetalle() {
   })
 
   const { data: produccionLote } = useQuery({
-    queryKey: ['lote-produccion-fcr', id],
+    queryKey: ['lote-produccion', id],
     queryFn: async () => {
       const { data } = await supabase.from('produccion')
-        .select('huevos_producidos, consumo_alimento_kg')
+        .select('id, fecha, huevos_producidos, porcentaje_postura, consumo_alimento_kg, observaciones')
         .eq('lote_id', id)
+        .order('fecha', { ascending: false })
+      return data || []
+    },
+    enabled: !!id,
+  })
+
+  const { data: tratamientosLote } = useQuery({
+    queryKey: ['lote-tratamientos', id],
+    queryFn: async () => {
+      const { data } = await supabase.from('tratamientos')
+        .select('id, fecha_inicio, fecha_fin, tipo, nombre_producto, responsable, estado')
+        .eq('lote_id', id)
+        .order('fecha_inicio', { ascending: false })
+      return data || []
+    },
+    enabled: !!id,
+  })
+
+  const { data: mortalidadLote } = useQuery({
+    queryKey: ['lote-mortalidad', id],
+    queryFn: async () => {
+      const { data } = await supabase.from('mortalidad')
+        .select('id, fecha, cantidad_bajas, causa, observaciones')
+        .eq('lote_id', id)
+        .order('fecha', { ascending: false })
       return data || []
     },
     enabled: !!id,
@@ -259,8 +551,8 @@ export default function LoteDetalle() {
       if (error) throw error
     },
     onSuccess: (_, nuevoEstado) => {
-      qc.invalidateQueries(['lote', id])
-      qc.invalidateQueries(['lotes'])
+      qc.invalidateQueries({ queryKey: ['lote', id] })
+      qc.invalidateQueries({ queryKey: ['lotes'] })
       toast.success(
         nuevoEstado === 'finalizado' ? 'Lote finalizado correctamente'
         : nuevoEstado === 'activo'   ? 'Lote reactivado correctamente'
@@ -435,6 +727,24 @@ export default function LoteDetalle() {
               </div>
             )}
           </div>
+
+          {/* Producción del lote */}
+          <SeccionProduccion
+            registros={produccionLote || []}
+            config={config}
+            dark={dark}
+          />
+
+          {/* Tratamientos del lote */}
+          <SeccionTratamientos tratamientos={tratamientosLote || []} />
+
+          {/* Mortalidad del lote */}
+          <SeccionMortalidad
+            registros={mortalidadLote || []}
+            config={config}
+            loteInicial={lote.cantidad_inicial_aves || 0}
+            dark={dark}
+          />
 
           {/* Historial de cambios */}
           <div

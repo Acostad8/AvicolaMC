@@ -2,9 +2,10 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import {
   LayoutDashboard, Building2, Layers, Egg, Skull, Syringe,
-  Package, Users, UserCog, BarChart3, Settings, LogOut, Bird, X, Truck, ShieldCheck
+  Package, Users, UserCog, BarChart3, Settings, LogOut, Bird, X, Truck, ShieldCheck, TrendingUp,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { prefetchGalponesList, prefetchGalponesSelect, prefetchInsumosList, prefetchLotesList } from '../../lib/prefetch'
 
 const adminLinks = [
   { to: '/dashboard',                icon: LayoutDashboard, label: 'Dashboard',    exact: true },
@@ -17,6 +18,7 @@ const adminLinks = [
   { to: '/dashboard/proveedores',    icon: Truck,           label: 'Proveedores' },
   { to: '/dashboard/empleados',      icon: Users,           label: 'Empleados' },
   { to: '/dashboard/usuarios',       icon: UserCog,         label: 'Usuarios' },
+  { to: '/dashboard/predicciones',   icon: TrendingUp,      label: 'Predicción' },
   { to: '/dashboard/reportes',       icon: BarChart3,       label: 'Reportes' },
   { to: '/dashboard/auditoria',      icon: ShieldCheck,     label: 'Auditoría' },
   { to: '/dashboard/configuracion',  icon: Settings,        label: 'Configuración' },
@@ -29,9 +31,56 @@ const encargadoLinks = [
   { to: '/dashboard/produccion',   icon: Egg,             label: 'Producción' },
   { to: '/dashboard/mortalidad',   icon: Skull,           label: 'Mortalidad' },
   { to: '/dashboard/tratamientos', icon: Syringe,         label: 'Tratamientos' },
-  { to: '/dashboard/insumos',      icon: Package,         label: 'Insumos' },
-  { to: '/dashboard/reportes',     icon: BarChart3,       label: 'Reportes' },
+  { to: '/dashboard/insumos',        icon: Package,         label: 'Insumos' },
+  { to: '/dashboard/predicciones',   icon: TrendingUp,      label: 'Predicción' },
+  { to: '/dashboard/reportes',       icon: BarChart3,       label: 'Reportes' },
 ]
+
+const PREFETCH_ROUTES = {
+  '/dashboard/galpones': {
+    chunk: () => import('../../pages/private/galpones/GalponesList'),
+    data:  (a, id) => prefetchGalponesList(a, id),
+  },
+  '/dashboard/lotes': {
+    chunk: () => import('../../pages/private/lotes/LotesList'),
+    data:  (a, id) => prefetchLotesList(a, id),
+  },
+  '/dashboard/produccion': {
+    chunk: () => import('../../pages/private/produccion/ProduccionList'),
+    data:  (a, id) => prefetchGalponesSelect(a, id),
+  },
+  '/dashboard/mortalidad': {
+    chunk: () => import('../../pages/private/mortalidad/MortalidadList'),
+    data:  (a, id) => prefetchGalponesSelect(a, id),
+  },
+  '/dashboard/tratamientos': {
+    chunk: () => import('../../pages/private/tratamientos/TratamientosList'),
+    data:  (a, id) => prefetchGalponesSelect(a, id),
+  },
+  '/dashboard/insumos': {
+    chunk: () => import('../../pages/private/insumos/InsumosList'),
+    data:  () => prefetchInsumosList(),
+  },
+  '/dashboard/predicciones': {
+    chunk: () => import('../../pages/private/predicciones/Predicciones'),
+    data:  (a, id) => prefetchGalponesSelect(a, id),
+  },
+  '/dashboard/proveedores': {
+    chunk: () => import('../../pages/private/proveedores/ProveedoresList'),
+  },
+  '/dashboard/empleados': {
+    chunk: () => import('../../pages/private/empleados/EmpleadosList'),
+  },
+  '/dashboard/usuarios': {
+    chunk: () => import('../../pages/private/usuarios/UsuariosList'),
+  },
+  '/dashboard/reportes': {
+    chunk: () => import('../../pages/private/Reportes'),
+  },
+  '/dashboard/auditoria': {
+    chunk: () => import('../../pages/private/auditoria/Auditoria'),
+  },
+}
 
 export default function Sidebar({ open, onClose }) {
   const { perfil, isAdmin, signOut } = useAuth()
@@ -103,6 +152,13 @@ export default function Sidebar({ open, onClose }) {
               key={to}
               to={to}
               end={exact}
+              onMouseEnter={() => {
+                const route = PREFETCH_ROUTES[to]
+                if (route) {
+                  route.chunk?.()
+                  route.data?.(isAdmin, perfil?.id)
+                }
+              }}
               onClick={() => { if (window.innerWidth < 1024) onClose() }}
               className={({ isActive }) =>
                 `sidebar-link ${isActive ? 'sidebar-link-active' : 'sidebar-link-inactive'}`

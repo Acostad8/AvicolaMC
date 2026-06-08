@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -425,8 +425,8 @@ export default function LoteForm() {
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries(['lotes'])
-      if (isEdit) qc.invalidateQueries(['lote', id])
+      qc.invalidateQueries({ queryKey: ['lotes'] })
+      if (isEdit) qc.invalidateQueries({ queryKey: ['lote', id] })
       toast.success(isEdit ? 'Lote actualizado correctamente' : 'Lote creado correctamente')
       navigate(isEdit ? `/dashboard/lotes/${id}` : '/dashboard/lotes')
     },

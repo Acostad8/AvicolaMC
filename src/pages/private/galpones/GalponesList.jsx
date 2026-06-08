@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+﻿import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
@@ -215,7 +215,7 @@ export default function GalponesList() {
       const { error } = await supabase.from('galpones').update({ estado }).eq('id', id)
       if (error) throw error
     },
-    onSuccess: () => { qc.invalidateQueries(['galpones']); toast.success('Estado actualizado'); setConfirm(null) },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['galpones'] }); toast.success('Estado actualizado'); setConfirm(null) },
     onError: () => toast.error('Error al actualizar'),
   })
 

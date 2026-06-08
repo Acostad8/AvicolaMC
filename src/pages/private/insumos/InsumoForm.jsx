@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+﻿import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -204,9 +204,10 @@ export default function InsumoForm() {
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries(['insumos'])
+      qc.invalidateQueries({ queryKey: ['insumos'] })
+      qc.invalidateQueries({ queryKey: ['insumo', id] })
       toast.success(isEdit ? 'Insumo actualizado' : 'Insumo creado')
-      navigate('/dashboard/insumos')
+      navigate(isEdit ? `/dashboard/insumos/${id}` : '/dashboard/insumos')
     },
     onError: e => toast.error(e.message),
   })

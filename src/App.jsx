@@ -69,10 +69,11 @@ const ProveedoresList   = lazy(() => import('./pages/private/proveedores/Proveed
 const ProveedorForm     = lazy(() => import('./pages/private/proveedores/ProveedorForm'))
 const ProveedorDetalle  = lazy(() => import('./pages/private/proveedores/ProveedorDetalle'))
 
-// Reportes, Configuración y Auditoría
-const Reportes      = lazy(() => import('./pages/private/Reportes'))
-const Configuracion = lazy(() => import('./pages/private/configuracion/Configuracion'))
-const Auditoria     = lazy(() => import('./pages/private/auditoria/Auditoria'))
+// Reportes, Configuración, Auditoría y Predicción
+const Reportes       = lazy(() => import('./pages/private/Reportes'))
+const Configuracion  = lazy(() => import('./pages/private/configuracion/Configuracion'))
+const Auditoria      = lazy(() => import('./pages/private/auditoria/Auditoria'))
+const Predicciones   = lazy(() => import('./pages/private/predicciones/Predicciones'))
 
 function PageLoader() {
   return (
@@ -157,6 +158,7 @@ export default function App() {
                     <Route path="/dashboard/proveedores/:id" element={<AdminRoute><ProveedorDetalle /></AdminRoute>} />
                     <Route path="/dashboard/proveedores/:id/editar" element={<AdminRoute><ProveedorForm /></AdminRoute>} />
 
+                    <Route path="/dashboard/predicciones" element={<Predicciones />} />
                     <Route path="/dashboard/reportes" element={<Reportes />} />
                     <Route path="/dashboard/configuracion" element={<AdminRoute><Configuracion /></AdminRoute>} />
                     <Route path="/dashboard/auditoria" element={<AdminRoute><Auditoria /></AdminRoute>} />

@@ -41,7 +41,9 @@
       "Bash(extract-text \"C:\\\\Users\\\\USUARIO\\\\Documents\\\\Historias de Usuario TABLAS.docx\")",
       "Bash(timeout 5)",
       "Bash(supabase *)",
-      "mcp__claude_ai_Supabase__get_logs"
+      "mcp__claude_ai_Supabase__get_logs",
+      "Bash(node -e \"const p = require\\('./package.json'\\); console.log\\('@tanstack/react-query:', p.dependencies['@tanstack/react-query']\\)\")",
+      "Bash(findstr /v \"KEY\\\\|key\\\\|secret\\\\|SECRET\")"
     ]
   }
 }

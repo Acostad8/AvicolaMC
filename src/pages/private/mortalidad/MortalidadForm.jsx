@@ -324,9 +324,9 @@ export default function MortalidadForm() {
           loteNombre:    loteActivo.nombre_numero || '',
         })
       }
-      qc.invalidateQueries(['mortalidad'])
-      qc.invalidateQueries(['mortalidad-detalle', id])
-      qc.invalidateQueries(['lotes'])
+      qc.invalidateQueries({ queryKey: ['mortalidad'] })
+      qc.invalidateQueries({ queryKey: ['mortalidad-detalle', id] })
+      qc.invalidateQueries({ queryKey: ['lotes'] })
       toast.success(isEdit ? 'Registro actualizado correctamente' : 'Mortalidad registrada correctamente')
       navigate(isEdit ? `/dashboard/mortalidad/${id}` : '/dashboard/mortalidad')
     },

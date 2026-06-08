@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -175,18 +175,23 @@ export default function GalponForm() {
     enabled: isEdit,
   })
 
-  const { data: tieneLoteActivo } = useQuery({
+  const { data: loteActivoInfo } = useQuery({
     queryKey: ['galpon-lote-activo', id],
     queryFn: async () => {
-      const { count } = await supabase
+      const { data } = await supabase
         .from('lotes')
-        .select('id', { count: 'exact', head: true })
+        .select('id, cantidad_aves_actuales')
         .eq('galpon_id', id)
         .eq('estado', 'activo')
-      return (count || 0) > 0
+        .maybeSingle()
+      return data
     },
     enabled: isEdit,
   })
+
+  const tieneLoteActivo      = !!loteActivoInfo
+  const avesActivas          = loteActivoInfo?.cantidad_aves_actuales ?? 0
+  const capacidadInsuficiente = tieneLoteActivo && Number(capacidad) < avesActivas
 
   useEffect(() => {
     if (galpon) reset({
@@ -200,6 +205,9 @@ export default function GalponForm() {
 
   const mutation = useMutation({
     mutationFn: async (values) => {
+      if (tieneLoteActivo && Number(values.capacidad_maxima) < avesActivas)
+        throw new Error(`La capacidad no puede ser menor a las ${avesActivas.toLocaleString('es-CO')} aves activas en el lote actual`)
+
       const payload = { ...values, encargado_id: values.encargado_id || null }
       // El estado en_produccion lo gestiona el trigger; no se actualiza manualmente
       if (tieneLoteActivo) delete payload.estado
@@ -212,9 +220,10 @@ export default function GalponForm() {
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries(['galpones'])
+      qc.invalidateQueries({ queryKey: ['galpones'] })
+      qc.invalidateQueries({ queryKey: ['galpon', id] })
       toast.success(isEdit ? 'Galpón actualizado correctamente' : 'Galpón creado correctamente')
-      navigate('/dashboard/galpones')
+      navigate(isEdit ? `/dashboard/galpones/${id}` : '/dashboard/galpones')
     },
     onError: e => toast.error(e.message || 'Error al guardar'),
   })
@@ -289,12 +298,18 @@ export default function GalponForm() {
                   type="number"
                   min="1"
                   placeholder="Ej: 5000"
-                  error={errors.capacidad_maxima?.message}
+                  error={errors.capacidad_maxima?.message || (capacidadInsuficiente ? `Mínimo ${avesActivas.toLocaleString('es-CO')} (aves activas en el lote)` : undefined)}
                   {...register('capacidad_maxima')}
                 />
-                {capacidad > 0 && (
+                {capacidad > 0 && !capacidadInsuficiente && (
                   <p className="text-xs text-stone-400 dark:text-stone-500 mt-1.5">
                     Total: <span className="font-semibold text-stone-600 dark:text-stone-300">{Number(capacidad).toLocaleString('es-CO')} aves</span>
+                  </p>
+                )}
+                {tieneLoteActivo && !capacidadInsuficiente && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1.5 flex items-center gap-1">
+                    <Lock className="h-3 w-3 flex-shrink-0" />
+                    Mínimo permitido: <span className="font-semibold">{avesActivas.toLocaleString('es-CO')} aves</span> (lote activo)
                   </p>
                 )}
               </div>
@@ -369,7 +384,7 @@ export default function GalponForm() {
           )}
 
           <div className="flex gap-3 pt-2 border-t border-stone-100 dark:border-stone-800">
-            <Button type="submit" loading={mutation.isPending || isSubmitting} disabled={!!nombreDuplicado}>
+            <Button type="submit" loading={mutation.isPending || isSubmitting} disabled={!!nombreDuplicado || !!capacidadInsuficiente}>
               {isEdit ? 'Guardar cambios' : 'Crear galpón'}
             </Button>
             <Button type="button" variant="secondary" onClick={() => navigate('/dashboard/galpones')}>

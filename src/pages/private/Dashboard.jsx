@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, memo, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
@@ -7,6 +7,7 @@ import { useA11y } from '../../context/AccessibilityContext'
 import { useConfig } from '../../context/ConfigContext'
 import { formatNumber, formatDate, calcWeeksAge } from '../../lib/utils'
 import { useAutoRefreshAtMidnight } from '../../hooks/useAutoRefreshAtMidnight'
+import { linearRegression } from '../../lib/estadistica'
 import {
   Building2, Egg, Skull, TrendingUp, AlertTriangle,
   Package, BarChart3, Activity, Bird, ChevronRight, Calendar,
@@ -61,7 +62,7 @@ function TrendBadge({ current, previous, inverse = false }) {
 }
 
 /* ── KPI card ── */
-function KpiCard({ label, value, rawValue, icon: Icon, gradient, sub, trend, delay = 0, noMotion }) {
+const KpiCard = memo(function KpiCard({ label, value, rawValue, icon: Icon, gradient, sub, trend, delay = 0, noMotion }) {
   const counted = useCountUp(typeof rawValue === 'number' ? rawValue : 0)
   const display  = typeof rawValue === 'number' ? formatNumber(counted) : value
   return (
@@ -80,10 +81,10 @@ function KpiCard({ label, value, rawValue, icon: Icon, gradient, sub, trend, del
       {sub && <p className="text-[11px] text-stone-400 dark:text-stone-500 mt-0.5">{sub}</p>}
     </div>
   )
-}
+})
 
 /* ── Postura ring (SVG circular gauge) ── */
-function PosturaRing({ value, isDark, size = 96 }) {
+const PosturaRing = memo(function PosturaRing({ value, isDark, size = 96 }) {
   const pct   = Math.min(Math.max(parseFloat(value) || 0, 0), 100)
   const r     = (size - 12) / 2
   const circ  = 2 * Math.PI * r
@@ -105,10 +106,10 @@ function PosturaRing({ value, isDark, size = 96 }) {
       </text>
     </svg>
   )
-}
+})
 
 /* ── Lote health card ── */
-function LoteCard({ lote, posturaConfig, delay = 0, noMotion }) {
+const LoteCard = memo(function LoteCard({ lote, posturaConfig, delay = 0, noMotion }) {
   const { postura_excelente: exc, postura_buena: bue, postura_regular: reg } = posturaConfig
   const survPct   = lote.cantidad_inicial_aves > 0
     ? (lote.cantidad_aves_actuales / lote.cantidad_inicial_aves * 100)
@@ -172,10 +173,10 @@ function LoteCard({ lote, posturaConfig, delay = 0, noMotion }) {
       </div>
     </Link>
   )
-}
+})
 
 /* ── Activity item ── */
-function ActivityItem({ record, posturaConfig, delay = 0, noMotion }) {
+const ActivityItem = memo(function ActivityItem({ record, posturaConfig, delay = 0, noMotion }) {
   const { postura_excelente: exc, postura_buena: bue, postura_regular: reg } = posturaConfig
   const pct = parseFloat(record.porcentaje_postura) || 0
   const badgeCls = pct >= exc
@@ -207,7 +208,7 @@ function ActivityItem({ record, posturaConfig, delay = 0, noMotion }) {
       </div>
     </div>
   )
-}
+})
 
 /* ── Quick action link ── */
 function ActionLink({ to, gradient, icon: Icon, label, desc, delay = 0, noMotion }) {
@@ -411,8 +412,82 @@ function InsumosSemaforoPanel({ insumos, noMotion }) {
   )
 }
 
+/* ── Widget predicción 7 días ── */
+const PrediccionWidget = memo(function PrediccionWidget({ chartData, noMotion }) {
+  const prediccion = useMemo(() => {
+    const conDatos = (chartData || []).filter(d => d.huevos > 0)
+    if (conDatos.length < 5) return null
+    const points = conDatos.map((d, i) => ({ x: i, y: d.huevos }))
+    const { slope, intercept, r2 } = linearRegression(points)
+    const dias = Array.from({ length: 7 }, (_, i) =>
+      Math.max(0, Math.round(slope * (points.length + i) + intercept))
+    )
+    const totalEst = dias.reduce((s, v) => s + v, 0)
+    const tendencia = slope > 30 ? 'alza' : slope < -30 ? 'baja' : 'estable'
+    return { totalEst, diarioEst: Math.round(totalEst / 7), tendencia, r2: Math.round(r2 * 100) }
+  }, [chartData])
+
+  if (!prediccion) return null
+
+  const tendenciaColor = prediccion.tendencia === 'alza'
+    ? 'text-green-600 dark:text-green-400'
+    : prediccion.tendencia === 'baja'
+    ? 'text-red-500 dark:text-red-400'
+    : 'text-stone-500 dark:text-stone-400'
+  const tendenciaLabel = prediccion.tendencia === 'alza' ? '↗ En alza'
+    : prediccion.tendencia === 'baja' ? '↘ A la baja' : '→ Estable'
+
+  return (
+    <div
+      className="card p-5"
+      style={noMotion ? undefined : { animation: 'fadeInUp 0.5s ease-out both', animationDelay: '420ms' }}
+    >
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 bg-gradient-to-br from-teal-400 to-teal-600 rounded-lg flex items-center justify-center shadow-sm">
+            <TrendingUp className="h-4 w-4 text-white" aria-hidden="true" />
+          </div>
+          <div>
+            <h2 className="section-title leading-none">Predicción 7 días</h2>
+            <p className="text-[11px] text-stone-400 dark:text-stone-500 mt-0.5">Basada en tendencia reciente</p>
+          </div>
+        </div>
+        <Link to="/dashboard/predicciones" className="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium flex items-center gap-1">
+          Ver análisis <ChevronRight className="h-3 w-3" />
+        </Link>
+      </div>
+
+      <div className="space-y-2.5">
+        <div className="bg-stone-50 dark:bg-stone-800/50 rounded-xl px-3 py-2.5">
+          <p className="text-[10px] text-stone-400 dark:text-stone-500 uppercase tracking-wide">Producción estimada (7d)</p>
+          <p className="text-2xl font-bold text-stone-800 dark:text-stone-100 tabular-nums mt-0.5">{formatNumber(prediccion.totalEst)}</p>
+          <p className="text-[11px] text-stone-400 dark:text-stone-500">huevos en los próximos 7 días</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-stone-50 dark:bg-stone-800/50 rounded-xl px-3 py-2">
+            <p className="text-[10px] text-stone-400 dark:text-stone-500 uppercase tracking-wide">Diario est.</p>
+            <p className="text-sm font-bold text-stone-700 dark:text-stone-200 tabular-nums mt-0.5">{formatNumber(prediccion.diarioEst)}</p>
+          </div>
+          <div className="bg-stone-50 dark:bg-stone-800/50 rounded-xl px-3 py-2">
+            <p className="text-[10px] text-stone-400 dark:text-stone-500 uppercase tracking-wide">Tendencia</p>
+            <p className={`text-sm font-bold mt-0.5 ${tendenciaColor}`}>{tendenciaLabel}</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 pt-0.5">
+          <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${prediccion.r2 >= 70 ? 'bg-green-500' : prediccion.r2 >= 40 ? 'bg-amber-500' : 'bg-stone-400'}`} />
+          <p className="text-[10px] text-stone-400 dark:text-stone-500">
+            Precisión del modelo: {prediccion.r2}%
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+})
+
 /* ── Mini analytics bar ── */
-function AnalyticsBar({ kpis, posturaConfig, noMotion }) {
+const AnalyticsBar = memo(function AnalyticsBar({ kpis, posturaConfig, noMotion }) {
   const umbralMort  = posturaConfig?.alerta_mortalidad ?? 5
   const mortOk      = parseFloat(kpis?.mortPct14d ?? 0) < umbralMort
   const pesoHuevoKg = (posturaConfig?.peso_promedio_huevo_g ?? 60) / 1000
@@ -489,7 +564,7 @@ function AnalyticsBar({ kpis, posturaConfig, noMotion }) {
       ))}
     </div>
   )
-}
+})
 
 /* ══════════════════════════════════════════════════
    DASHBOARD PRINCIPAL
@@ -921,6 +996,9 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+
+          {/* Predicción 7 días */}
+          <PrediccionWidget chartData={chartData} noMotion={noMotion} />
 
           {/* Inventario semáforo (solo admin) */}
           {isAdmin && insumos && insumos.length > 0 && (

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+﻿import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -196,7 +196,7 @@ export default function EmpleadoForm() {
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries(['empleados'])
+      qc.invalidateQueries({ queryKey: ['empleados'] })
       toast.success(isEdit ? 'Empleado actualizado' : 'Empleado creado')
       navigate('/dashboard/empleados')
     },
