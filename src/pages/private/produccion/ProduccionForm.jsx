@@ -307,17 +307,21 @@ export default function ProduccionForm() {
     enabled: !!galponId && !isEdit,
   })
 
-  /* ── Duplicado ── */
-  const { data: duplicado } = useQuery({
-    queryKey: ['produccion-duplicado', galponId, fecha, id],
+  /* ── Fechas registradas del galpón (validación local de duplicado) ── */
+  const { data: fechasRegistradas } = useQuery({
+    queryKey: ['produccion-fechas', galponId],
     queryFn: async () => {
-      let q = supabase.from('produccion').select('id').eq('galpon_id', galponId).eq('fecha', fecha)
-      if (id) q = q.neq('id', id)
-      const { data } = await q.maybeSingle()
-      return data
+      const { data } = await supabase
+        .from('produccion')
+        .select('id, fecha')
+        .eq('galpon_id', galponId)
+      return new Set((data || []).filter(r => r.id !== id).map(r => r.fecha))
     },
-    enabled: !!galponId && !!fecha,
+    enabled: !!galponId,
+    staleTime: 30_000,
   })
+
+  const duplicado = fechasRegistradas?.has(fecha) ? true : null
 
   const avesRef    = isEdit ? registro?.lote?.cantidad_aves_actuales : loteActivo?.cantidad_aves_actuales
   const superaAves = avesRef && Number(huevos) > avesRef
@@ -392,8 +396,15 @@ export default function ProduccionForm() {
 
       } else {
         if (!loteActivo) throw new Error('No hay lote activo en este galpón')
-        if (duplicado)   throw new Error('Ya existe un registro de producción para este galpón en esta fecha')
         if (superaAves)  throw new Error(`Los huevos (${values.huevos_producidos}) no pueden superar las aves activas (${loteActivo.cantidad_aves_actuales})`)
+
+        const { data: dupCheck } = await supabase
+          .from('produccion')
+          .select('id')
+          .eq('galpon_id', values.galpon_id)
+          .eq('fecha', values.fecha)
+          .maybeSingle()
+        if (dupCheck) throw new Error('Ya existe un registro de producción para este galpón en esta fecha')
 
         const postura = calcPostura(values.huevos_producidos, loteActivo.cantidad_aves_actuales)
         const { error } = await supabase.from('produccion').insert({

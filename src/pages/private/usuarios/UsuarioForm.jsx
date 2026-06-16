@@ -307,6 +307,15 @@ export default function UsuarioForm() {
         if (id === currentUser?.id && values.estado === 'inactivo') throw new Error('No puedes desactivarte a ti mismo')
         if (id === currentUser?.id && values.rol !== 'administrador') throw new Error('No puedes quitarte el rol de administrador')
 
+        // Si el email cambió, actualizarlo en auth.users vía Edge Function
+        if (emailNorm !== (usuario?.email || '').trim().toLowerCase()) {
+          const { data: fnData, error: fnError } = await supabase.functions.invoke('create-user', {
+            body: { action: 'update-email', userId: id, email: emailNorm },
+          })
+          if (fnError) throw fnError
+          if (fnData?.error) throw new Error(fnData.error)
+        }
+
         const { error } = await supabase.from('perfiles').update({
           nombre_completo: values.nombre_completo, email: values.email,
           rol: values.rol, estado: values.estado, empleado_id: values.empleado_id || null,
