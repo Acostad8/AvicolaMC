@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
+import { useConfig } from '../../../context/ConfigContext'
 import PageHeader from '../../../components/ui/PageHeader'
 import Button from '../../../components/ui/Button'
 import Pagination from '../../../components/ui/Pagination'
@@ -210,6 +211,7 @@ function StatCard({ icon: Icon, gradient, label, value, loading }) {
 // ── Componente principal ──────────────────────────────────────────
 
 export default function Auditoria() {
+  const { config } = useConfig()
   const [filters, setFilters] = useState({ tabla: '', operacion: '', usuario_id: '', desde: '', hasta: '' })
   const [applied, setApplied] = useState({ tabla: '', operacion: '', usuario_id: '', desde: '', hasta: '' })
   const [page, setPage]       = useState(1)
@@ -310,19 +312,30 @@ export default function Auditoria() {
       const { data: rows } = await q
 
       const doc = new jsPDF({ orientation: 'landscape' })
+      const g   = config.granja
+      const nombreGranja = g.nombre || 'Sistema de Gestión Avícola MC'
       const now = new Date().toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })
 
       doc.setFontSize(16)
       doc.setFont('helvetica', 'bold')
-      doc.text('Auditoría del Sistema — Avícola MC', 14, 18)
+      doc.text(`Auditoría del Sistema — ${nombreGranja}`, 14, 18)
       doc.setFontSize(9)
       doc.setFont('helvetica', 'normal')
       doc.setTextColor(120)
-      doc.text(`Generado: ${now}  ·  Total registros: ${rows?.length || 0}`, 14, 25)
+      const metaLineas = [
+        g.nit      ? `NIT: ${g.nit}`                                                : null,
+        g.direccion ? `${g.direccion}${g.ciudad ? `, ${g.ciudad}` : ''}`            : g.ciudad || null,
+        g.telefono  ? `Tel: ${g.telefono}`                                           : null,
+        g.email     ? `Correo: ${g.email}`                                           : null,
+      ].filter(Boolean)
+      if (metaLineas.length > 0) {
+        doc.text(metaLineas.join('  ·  '), 14, 24)
+      }
+      doc.text(`Generado: ${now}  ·  Total registros: ${rows?.length || 0}`, 14, metaLineas.length > 0 ? 30 : 25)
       doc.setTextColor(0)
 
       autoTable(doc, {
-        startY: 30,
+        startY: metaLineas.length > 0 ? 36 : 30,
         styles: { fontSize: 8, cellPadding: 3 },
         headStyles: { fillColor: [79, 70, 229], textColor: 255, fontStyle: 'bold' },
         alternateRowStyles: { fillColor: [248, 248, 248] },

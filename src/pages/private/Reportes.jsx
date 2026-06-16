@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import { useA11y } from '../../context/AccessibilityContext'
+import { useConfig } from '../../context/ConfigContext'
 import { formatDate, downloadCSV, getLabelFromValue, CAUSAS_MORTALIDAD, TIPOS_TRATAMIENTO } from '../../lib/utils'
 import Button from '../../components/ui/Button'
 import { StatusBadge } from '../../components/ui/Badge'
@@ -23,6 +24,7 @@ const REPORTES = [
 export default function Reportes() {
   const { isAdmin, perfil } = useAuth()
   const { dark } = useA11y()
+  const { config } = useConfig()
 
   const [activeReport, setActiveReport] = useState('produccion')
   const [filterGalpon, setFilterGalpon] = useState('')
@@ -57,14 +59,16 @@ export default function Reportes() {
       const galponIds = filterGalpon ? [filterGalpon] : (galpones || []).map(g => g.id)
 
       if (activeReport === 'produccion') {
-        let q = supabase.from('produccion').select(`*, galpon:galpones(nombre), lote:lotes(nombre_numero, cantidad_aves_actuales), registrado:perfiles(nombre_completo)`).order('fecha', { ascending: false }).limit(500)
+        let q = supabase.from('produccion').select(`*, galpon:galpones(nombre), lote:lotes(nombre_numero, cantidad_aves_actuales), registrado:perfiles(nombre_completo)`).order('fecha', {
+          ascending: false }).limit(500)
         if (galponIds.length > 0) q = q.in('galpon_id', galponIds)
         if (filterDesde) q = q.gte('fecha', filterDesde)
         if (filterHasta) q = q.lte('fecha', filterHasta)
         const { data } = await q; return data || []
       }
       if (activeReport === 'mortalidad') {
-        let q = supabase.from('mortalidad').select(`*, galpon:galpones(nombre), lote:lotes(nombre_numero), registrado:perfiles(nombre_completo)`).order('fecha', { ascending: false }).limit(500)
+        let q = supabase.from('mortalidad').select(`*, galpon:galpones(nombre), lote:lotes(nombre_numero), registrado:perfiles(nombre_completo)`).order('fecha',
+          { ascending: false }).limit(500)
         if (galponIds.length > 0) q = q.in('galpon_id', galponIds)
         if (filterDesde) q = q.gte('fecha', filterDesde)
         if (filterHasta) q = q.lte('fecha', filterHasta)
@@ -72,7 +76,8 @@ export default function Reportes() {
         const { data } = await q; return data || []
       }
       if (activeReport === 'tratamientos') {
-        let q = supabase.from('tratamientos').select(`*, galpon:galpones(nombre), lote:lotes(nombre_numero)`).order('fecha_inicio', { ascending: false }).limit(500)
+        let q = supabase.from('tratamientos').select(`*, galpon:galpones(nombre), lote:lotes(nombre_numero)`).order('fecha_inicio',
+          { ascending: false }).limit(500)
         if (galponIds.length > 0) q = q.in('galpon_id', galponIds)
         if (filterDesde) q = q.gte('fecha_inicio', filterDesde)
         if (filterHasta) q = q.lte('fecha_inicio', filterHasta)
@@ -269,18 +274,39 @@ export default function Reportes() {
 
   function generatePDF() {
     const doc = new jsPDF()
+    const g   = config.granja
+    const nombreGranja = g.nombre || 'Sistema de Gestión Avícola MC'
+    const now = new Date().toLocaleDateString('es-CO')
+
     doc.setFontSize(16)
-    doc.text('Sistema de Gestión Avícola MC', 14, 20)
+    doc.setFont('helvetica', 'bold')
+    doc.text(nombreGranja, 14, 20)
+
     doc.setFontSize(12)
+    doc.setFont('helvetica', 'normal')
     doc.text(activeReport === 'comparativa'
       ? 'Comparativa de rendimiento entre galpones'
       : `Reporte: ${REPORTES.find(r => r.id === activeReport)?.label}`, 14, 30)
-    doc.setFontSize(9)
-    doc.text(`Generado: ${new Date().toLocaleDateString('es-CO')}`, 14, 37)
+
+    doc.setFontSize(8)
+    doc.setTextColor(120)
+    const metaLineas = [
+      g.nit       ? `NIT: ${g.nit}`                                                    : null,
+      g.direccion ? `${g.direccion}${g.ciudad ? `, ${g.ciudad}` : ''}`                 : g.ciudad || null,
+      g.telefono  ? `Tel: ${g.telefono}`                                                : null,
+      g.email     ? `Correo: ${g.email}`                                                : null,
+    ].filter(Boolean)
+    if (metaLineas.length > 0) {
+      doc.text(metaLineas.join('  ·  '), 14, 37)
+    }
+    doc.text(`Generado: ${now}`, 14, metaLineas.length > 0 ? 43 : 37)
+    doc.setTextColor(0)
+
+    const startY = metaLineas.length > 0 ? 50 : 44
     const csvData = toCSVData()
     if (csvData.length > 0) {
       autoTable(doc, {
-        startY: 44,
+        startY,
         head: [Object.keys(csvData[0])],
         body: csvData.map(row => Object.values(row).map(v => String(v ?? ''))),
         styles: { fontSize: 7 },

@@ -2,6 +2,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../context/AuthContext'
+import { useConfig } from '../../../context/ConfigContext'
 import { formatDate, getLabelFromValue, TIPOS_TRATAMIENTO } from '../../../lib/utils'
 import PageHeader from '../../../components/ui/PageHeader'
 import Button from '../../../components/ui/Button'
@@ -10,7 +11,7 @@ import AuditHistorial from '../../../components/ui/AuditHistorial'
 import {
   Pencil, Download, Syringe, Pill, FlaskConical, Shield,
   Bug, Activity, Building2, Calendar, CalendarCheck,
-  User, ClipboardList, Package, Beaker, CheckCircle2, Clock3, Clock, Lock, ShieldCheck,
+  User, ClipboardList, Package, Beaker, CheckCircle2, Clock3, Clock, Lock, ShieldCheck, AlertTriangle,
 } from 'lucide-react'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -154,6 +155,8 @@ function LoadingSkeleton() {
 export default function TratamientoDetalle() {
   const { id }      = useParams()
   const { isAdmin } = useAuth()
+  const { config }  = useConfig()
+  const umbralDias  = config.produccion?.umbral_dias_tratamiento ?? 7
 
   const { data: t, isLoading } = useQuery({
     queryKey: ['tratamiento', id],
@@ -216,6 +219,10 @@ export default function TratamientoDetalle() {
   const tipoLabel   = getLabelFromValue(TIPOS_TRATAMIENTO, t.tipo)
   const isActivo    = t.estado === 'activo'
   const hasFechaFin = !!t.fecha_fin
+  const diasActivo  = t.fecha_inicio
+    ? Math.floor((Date.now() - new Date(t.fecha_inicio + 'T00:00:00').getTime()) / 86_400_000)
+    : 0
+  const isProlongado = isActivo && diasActivo > umbralDias
 
   const msTranscurridos = t.created_at ? Date.now() - new Date(t.created_at).getTime() : Infinity
   const dentroDeVentana = msTranscurridos <= 86_400_000
@@ -244,6 +251,17 @@ export default function TratamientoDetalle() {
           </div>
         }
       />
+
+      {isProlongado && (
+        <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
+          <AlertTriangle className="h-4 w-4 text-amber-500 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-amber-800 dark:text-amber-300">
+            Este tratamiento lleva <strong>{diasActivo} días</strong> activo sin finalizar,
+            superando el umbral configurado de <strong>{umbralDias} días</strong>.
+            Considera completarlo o revisar su estado.
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
 

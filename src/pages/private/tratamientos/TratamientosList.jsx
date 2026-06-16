@@ -4,8 +4,9 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../context/AuthContext'
 import { useA11y } from '../../../context/AccessibilityContext'
+import { useConfig } from '../../../context/ConfigContext'
 import { formatDate, downloadCSV, getLabelFromValue, TIPOS_TRATAMIENTO } from '../../../lib/utils'
-import { Plus, Download, Eye, Pencil, Syringe, CheckCircle2, Activity, Layers, Lock, Clock, Search, User } from 'lucide-react'
+import { Plus, Download, Eye, Pencil, Syringe, CheckCircle2, Activity, AlertTriangle, Lock, Clock, Search, User } from 'lucide-react'
 import Button from '../../../components/ui/Button'
 import { StatusBadge } from '../../../components/ui/Badge'
 import PageHeader from '../../../components/ui/PageHeader'
@@ -62,8 +63,15 @@ function TipoBadge({ tipo }) {
   )
 }
 
+function diasDesdeInicio(fecha_inicio) {
+  if (!fecha_inicio) return 0
+  return Math.floor((Date.now() - new Date(fecha_inicio).getTime()) / 86_400_000)
+}
+
 export default function TratamientosList() {
   const { isAdmin, perfil } = useAuth()
+  const { config } = useConfig()
+  const umbralDias = config.produccion?.umbral_dias_tratamiento ?? 7
   useA11y()
 
   const [search,       setSearch]       = useState('')
@@ -112,12 +120,14 @@ export default function TratamientosList() {
   const kpis = useMemo(() => {
     const list = data || []
     if (!list.length) return null
-    const total      = list.length
-    const enCurso    = list.filter(r => r.estado === 'activo').length
+    const total       = list.length
+    const enCurso     = list.filter(r => r.estado === 'activo').length
     const finalizados = list.filter(r => r.estado === 'finalizado').length
-    const tiposDistintos = new Set(list.map(r => r.tipo).filter(Boolean)).size
-    return { total, enCurso, finalizados, tiposDistintos }
-  }, [data])
+    const prolongados = list.filter(r =>
+      r.estado === 'activo' && diasDesdeInicio(r.fecha_inicio) > umbralDias
+    ).length
+    return { total, enCurso, finalizados, prolongados }
+  }, [data, umbralDias])
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim()
@@ -190,13 +200,24 @@ export default function TratamientosList() {
         />
         <KpiCard
           loading={isLoading}
-          icon={Layers}
-          gradient="from-purple-400 to-purple-600"
-          label="Tipos distintos"
-          value={kpis ? kpis.tiposDistintos : '—'}
-          sub="tipos de tratamiento"
+          icon={AlertTriangle}
+          gradient={kpis?.prolongados > 0 ? 'from-amber-400 to-orange-500' : 'from-stone-400 to-stone-500'}
+          label="Prolongados"
+          value={kpis ? kpis.prolongados : '—'}
+          sub={`activos > ${umbralDias} días`}
         />
       </div>
+
+      {/* ── Banner de alerta para prolongados ── */}
+      {!isLoading && kpis?.prolongados > 0 && (
+        <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
+          <AlertTriangle className="h-4 w-4 text-amber-500 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-amber-800 dark:text-amber-300">
+            <strong>{kpis.prolongados} tratamiento{kpis.prolongados !== 1 ? 's' : ''}</strong> lleva{kpis.prolongados !== 1 ? 'n' : ''} más de <strong>{umbralDias} días</strong> activo{kpis.prolongados !== 1 ? 's' : ''} sin finalizar.
+            Revisa si requieren atención o cierre. El umbral se configura en <strong>Configuración → Producción</strong>.
+          </p>
+        </div>
+      )}
 
       {/* ── Filter bar ── */}
       <div className="card p-4 space-y-3">
@@ -323,7 +344,18 @@ export default function TratamientosList() {
                       )}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <StatusBadge status={r.estado} />
+                      <div className="flex items-center gap-1.5">
+                        <StatusBadge status={r.estado} />
+                        {r.estado === 'activo' && diasDesdeInicio(r.fecha_inicio) > umbralDias && (
+                          <span
+                            title={`Activo hace ${diasDesdeInicio(r.fecha_inicio)} días (umbral: ${umbralDias})`}
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
+                          >
+                            <AlertTriangle className="h-3 w-3" />
+                            {diasDesdeInicio(r.fecha_inicio)}d
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
