@@ -253,16 +253,16 @@ export default function MovimientoForm() {
           stockMinimo:  insumoSeleccionado.stock_minimo ?? 0,
           unidad:       insumoSeleccionado.unidad_medida,
         })
-      }
-      qc.invalidateQueries({ queryKey: ['insumos'] })
-      qc.invalidateQueries({ queryKey: ['insumos-activos'] })
-      qc.invalidateQueries({ queryKey: ['insumo', values.insumo_id] })
-      qc.invalidateQueries({ queryKey: ['movimientos-insumo', values.insumo_id] })
-      toast.success('Movimiento registrado correctamente')
-      navigate('/dashboard/insumos')
-    },
-    onError: e => toast.error(e.message || 'Error al guardar'),
-  })
+          }
+          qc.invalidateQueries({ queryKey: ['insumos'] })
+          qc.invalidateQueries({ queryKey: ['insumos-activos'] })
+          qc.invalidateQueries({ queryKey: ['insumo', values.insumo_id] })
+          qc.invalidateQueries({ queryKey: ['movimientos-insumo', values.insumo_id] })
+          toast.success('Movimiento registrado correctamente')
+          navigate('/dashboard/insumos')
+        },
+        onError: e => toast.error(e.message || 'Error al guardar'),
+      })
 
   return (
     <div className="w-full space-y-5">

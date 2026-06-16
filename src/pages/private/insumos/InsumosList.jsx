@@ -62,6 +62,7 @@ export default function InsumosList() {
 
   const [filterCat, setFilterCat]       = useState('')
   const [filterNombre, setFilterNombre] = useState('')
+  const [filterEstado, setFilterEstado] = useState('activo')
   const [page, setPage]       = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
@@ -92,11 +93,12 @@ export default function InsumosList() {
 
   const filtered = useMemo(() => {
     return (data || []).filter(i => {
+      if (filterEstado && i.estado !== filterEstado) return false
       if (filterCat && i.categoria !== filterCat) return false
       if (filterNombre && !i.nombre?.toLowerCase().includes(filterNombre.toLowerCase())) return false
       return true
     })
-  }, [data, filterCat, filterNombre])
+  }, [data, filterEstado, filterCat, filterNombre])
 
   const totalPages = Math.ceil(filtered.length / pageSize)
   const paginated  = filtered.slice((page - 1) * pageSize, page * pageSize)
@@ -173,7 +175,19 @@ export default function InsumosList() {
 
       {/* ── Filter bar ── */}
       <div className="card p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label className="label text-xs">Estado</label>
+            <select
+              className="input-base"
+              value={filterEstado}
+              onChange={e => { setFilterEstado(e.target.value); setPage(1) }}
+            >
+              <option value="">Todos</option>
+              <option value="activo">Activo</option>
+              <option value="inactivo">Inactivo</option>
+            </select>
+          </div>
           <div>
             <label className="label text-xs">Categoría</label>
             <select
