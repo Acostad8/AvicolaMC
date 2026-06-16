@@ -107,7 +107,7 @@ export default function Login() {
           {/* Decorative card */}
           <div className="mt-14 bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-5">
             <div className="flex items-center gap-2 mb-3">
-              <div className="flex gap-1">
+              <div className="fle x gap-1">
                 {[1,2,3,4,5].map(i => (
                   <div key={i} className="w-1.5 h-1.5 bg-amber-400 rounded-full" />
                 ))}

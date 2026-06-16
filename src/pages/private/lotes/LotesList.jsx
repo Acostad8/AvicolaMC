@@ -161,7 +161,7 @@ function LoteCard({ lote, index, noMotion, isAdmin }) {
 
 /* ── Main ── */
 export default function LotesList() {
-  useAutoRefreshAtMidnight()
+  useAutoRefreshAtMidnight()  
   const { isAdmin, perfil } = useAuth()
   const { noMotion } = useA11y()
   const [filterEstado, setFilterEstado] = useState('')

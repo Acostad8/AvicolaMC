@@ -768,7 +768,7 @@ export default function LoteDetalle() {
             className="card p-5"
             style={noMotion ? undefined : { animation: 'fadeInUp 0.5s ease-out 320ms both' }}
           >
-            <h2 className="section-title mb-5">Ciclo del lote</h2>
+            <h2 className="section-title mb-5"> </h2>
             <div>
               <TimelineStep
                 icon={CheckCircle2} label="Ingreso al galpón"

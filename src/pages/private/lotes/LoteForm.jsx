@@ -1,5 +1,5 @@
 ﻿import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -240,12 +240,14 @@ export default function LoteForm() {
   const navigate = useNavigate()
   const { id }   = useParams()
   const isEdit   = !!id
+  const [searchParams] = useSearchParams()
+  const galponFromUrl = !isEdit ? (searchParams.get('galpon') || '') : ''
   const { isAdmin, perfil } = useAuth()
   const qc = useQueryClient()
 
   const { register, handleSubmit, watch, reset, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(isEdit ? schemaEditar : schemaCrear),
-    defaultValues: { fecha_ingreso: new Date().toISOString().slice(0, 10) },
+    defaultValues: { fecha_ingreso: new Date().toISOString().slice(0, 10), galpon_id: galponFromUrl },
   })
 
   const galponId     = watch('galpon_id')
@@ -255,6 +257,24 @@ export default function LoteForm() {
   const razaId       = watch('raza_id')
   const notas        = watch('notas')
   const estadoActual = watch('estado')
+
+  const [nombreDebounced, setNombreDebounced] = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => setNombreDebounced(nombreLote?.trim() || ''), 400)
+    return () => clearTimeout(t)
+  }, [nombreLote])
+
+  const { data: nombreDuplicado } = useQuery({
+    queryKey: ['lote-nombre-check', nombreDebounced, id],
+    queryFn: async () => {
+      let q = supabase.from('lotes').select('id', { count: 'exact', head: true })
+        .ilike('nombre_numero', nombreDebounced)
+      if (id) q = q.neq('id', id)
+      const { count } = await q
+      return (count || 0) > 0
+    },
+    enabled: nombreDebounced.length > 0,
+  })
 
   const [confirmOpen, setConfirmOpen]     = useState(false)
   const [pendingValues, setPendingValues] = useState(null)
@@ -321,9 +341,14 @@ export default function LoteForm() {
 
   /* ── Galpones disponibles ── */
   const { data: galpones } = useQuery({
-    queryKey: ['galpones-select', isAdmin, perfil?.id],
+    queryKey: ['galpones-select', isAdmin, perfil?.id, galponFromUrl],
     queryFn: async () => {
-      let q = supabase.from('galpones').select('id, nombre, capacidad_maxima').eq('estado', 'disponible').order('nombre')
+      let q = supabase.from('galpones').select('id, nombre, capacidad_maxima').order('nombre')
+      if (galponFromUrl) {
+        q = q.or(`estado.eq.disponible,id.eq.${galponFromUrl}`)
+      } else {
+        q = q.eq('estado', 'disponible')
+      }
       if (!isAdmin) q = q.eq('encargado_id', perfil.id)
       const { data } = await q
       return data || []
@@ -529,7 +554,7 @@ export default function LoteForm() {
               <Input
                 label="Número / Nombre del lote"
                 placeholder="Ej: L-2024-01, Lote Primavera…"
-                error={errors.nombre_numero?.message}
+                error={errors.nombre_numero?.message || (nombreDuplicado ? 'Ya existe un lote con este nombre' : undefined)}
                 {...register('nombre_numero')}
               />
               {hasRecords ? (
@@ -673,7 +698,7 @@ export default function LoteForm() {
             <Button
               type="submit"
               loading={mutation.isPending || isSubmitting}
-              disabled={!hasRecords && formularioBloqueado}
+              disabled={!!nombreDuplicado || (!hasRecords && formularioBloqueado)}
             >
               {isEdit ? 'Guardar cambios' : 'Crear lote'}
             </Button>

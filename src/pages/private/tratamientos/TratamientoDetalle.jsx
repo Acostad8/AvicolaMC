@@ -178,7 +178,7 @@ export default function TratamientoDetalle() {
       if (error) throw error
       return data || []
     },
-    enabled: !!id && isAdmin,
+    enabled: !!id,
     retry: 1,
   })
 
@@ -388,14 +388,12 @@ export default function TratamientoDetalle() {
             </div>
           )}
 
-          {/* Historial de cambios (solo admin) */}
-          {isAdmin && (
-            <AuditHistorial
-              entries={auditoria}
-              loading={loadingAudit}
-              formatCambios={formatCambiosTratamiento}
-            />
-          )}
+          {/* Historial de cambios */}
+          <AuditHistorial
+            entries={auditoria}
+            loading={loadingAudit}
+            formatCambios={formatCambiosTratamiento}
+          />
         </div>
 
         {/* ── Columna derecha (1/3) ── */}

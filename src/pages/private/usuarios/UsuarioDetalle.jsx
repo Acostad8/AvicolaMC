@@ -196,11 +196,13 @@ export default function UsuarioDetalle() {
         .eq('operacion', 'UPDATE')
         .order('created_at', { ascending: false })
         .limit(30)
-      return (data || []).map(e => ({
-        ...e,
-        editado:    { nombre_completo: e.usuario_nombre },
-        editado_at: e.created_at,
-      }))
+      return (data || [])
+        .map(e => ({
+          ...e,
+          editado:    { nombre_completo: e.usuario_nombre },
+          editado_at: e.created_at,
+        }))
+        .filter(e => formatearCambios(e.datos_anteriores, e.datos_nuevos).length > 0)
     },
     enabled: !!id,
   })

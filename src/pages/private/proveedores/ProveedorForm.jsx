@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
-import { TIPOS_PROVEEDOR } from '../../../lib/utils'
+import { TIPOS_PROVEEDOR, CATEGORIAS_INSUMO } from '../../../lib/utils'
 import Input from '../../../components/ui/Input'
 import Select from '../../../components/ui/Select'
 import Textarea from '../../../components/ui/Textarea'
@@ -43,6 +43,33 @@ function FormSection({ icon: Icon, title, gradient, children }) {
   )
 }
 
+const CATEGORIA_BADGE = {
+  alimento:      'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400',
+  medicamento:   'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400',
+  vacuna:        'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400',
+  desinfectante: 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400',
+  herramienta:   'bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400',
+  otro:          'bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-500',
+}
+
+function CheckItem({ item, selected, onToggle }) {
+  const isSelected = selected.includes(item.id)
+  return (
+    <button
+      type="button"
+      onClick={() => onToggle(item.id)}
+      className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-stone-50 dark:hover:bg-stone-800/60 ${isSelected ? 'bg-primary-50 dark:bg-primary-950/20' : ''}`}
+    >
+      <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border transition-colors ${isSelected ? 'bg-primary-500 border-primary-500' : 'border-stone-300 dark:border-stone-600'}`}>
+        {isSelected && <Check className="h-2.5 w-2.5 text-white" />}
+      </div>
+      <span className={`text-sm ${isSelected ? 'text-primary-700 dark:text-primary-300 font-medium' : 'text-stone-700 dark:text-stone-300'}`}>
+        {item.nombre}
+      </span>
+    </button>
+  )
+}
+
 function CheckList({ items, selected, onToggle, emptyText }) {
   return (
     <div className="border border-stone-200 dark:border-stone-700 rounded-xl overflow-hidden">
@@ -51,22 +78,49 @@ function CheckList({ items, selected, onToggle, emptyText }) {
       ) : (
         <div className="max-h-44 overflow-y-auto divide-y divide-stone-100 dark:divide-stone-800">
           {items.map(item => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => onToggle(item.id)}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-stone-50 dark:hover:bg-stone-800/60 ${selected.includes(item.id) ? 'bg-primary-50 dark:bg-primary-950/20' : ''}`}
-            >
-              <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border transition-colors ${selected.includes(item.id) ? 'bg-primary-500 border-primary-500' : 'border-stone-300 dark:border-stone-600'}`}>
-                {selected.includes(item.id) && <Check className="h-2.5 w-2.5 text-white" />}
-              </div>
-              <span className={`text-sm ${selected.includes(item.id) ? 'text-primary-700 dark:text-primary-300 font-medium' : 'text-stone-700 dark:text-stone-300'}`}>
-                {item.nombre}
-              </span>
-            </button>
+            <CheckItem key={item.id} item={item} selected={selected} onToggle={onToggle} />
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function GroupedCheckList({ items, selected, onToggle, emptyText }) {
+  if (items.length === 0) {
+    return (
+      <div className="border border-stone-200 dark:border-stone-700 rounded-xl px-4 py-3">
+        <p className="text-stone-400 dark:text-stone-500 text-xs">{emptyText}</p>
+      </div>
+    )
+  }
+
+  const groups = CATEGORIAS_INSUMO
+    .map(cat => ({
+      ...cat,
+      items: items.filter(i => i.categoria === cat.value),
+    }))
+    .filter(g => g.items.length > 0)
+
+  return (
+    <div className="border border-stone-200 dark:border-stone-700 rounded-xl overflow-hidden max-h-52 overflow-y-auto">
+      {groups.map((group, gi) => (
+        <div key={group.value}>
+          <div className={`px-3 py-1.5 flex items-center gap-2 sticky top-0 bg-stone-50 dark:bg-stone-900 border-b border-stone-100 dark:border-stone-800 ${gi > 0 ? 'border-t border-stone-200 dark:border-stone-700' : ''}`}>
+            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wide ${CATEGORIA_BADGE[group.value] ?? CATEGORIA_BADGE.otro}`}>
+              {group.label}
+            </span>
+            <span className="text-[10px] text-stone-400 dark:text-stone-500 ml-auto">
+              {group.items.filter(i => selected.includes(i.id)).length}/{group.items.length}
+            </span>
+          </div>
+          <div className="divide-y divide-stone-100 dark:divide-stone-800">
+            {group.items.map(item => (
+              <CheckItem key={item.id} item={item} selected={selected} onToggle={onToggle} />
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -230,7 +284,7 @@ export default function ProveedorForm() {
   const { data: insumos } = useQuery({
     queryKey: ['insumos-activos'],
     queryFn: async () => {
-      const { data } = await supabase.from('insumos').select('id, nombre').eq('estado', 'activo').order('nombre')
+      const { data } = await supabase.from('insumos').select('id, nombre, categoria').eq('estado', 'activo').order('nombre')
       return data || []
     },
   })
@@ -244,7 +298,7 @@ export default function ProveedorForm() {
   })
 
   const { data: insumosAsignados } = useQuery({
-    queryKey: ['proveedor-insumos', id],
+    queryKey: ['proveedor-insumos-ids', id],
     queryFn: async () => {
       const { data } = await supabase.from('proveedores_insumos').select('insumo_id').eq('proveedor_id', id)
       return (data || []).map(r => r.insumo_id)
@@ -253,7 +307,7 @@ export default function ProveedorForm() {
   })
 
   const { data: razasAsignadas } = useQuery({
-    queryKey: ['proveedor-razas', id],
+    queryKey: ['proveedor-razas-ids', id],
     queryFn: async () => {
       const { data } = await supabase.from('proveedores_razas').select('raza_id').eq('proveedor_id', id)
       return (data || []).map(r => r.raza_id)
@@ -284,17 +338,30 @@ export default function ProveedorForm() {
         if (error) throw error
         proveedorId = data.id
       }
-      await supabase.from('proveedores_insumos').delete().eq('proveedor_id', proveedorId)
+      const { error: delInsumos } = await supabase.from('proveedores_insumos').delete().eq('proveedor_id', proveedorId)
+      if (delInsumos) throw new Error(`Error al actualizar insumos: ${delInsumos.message}`)
       if (selectedInsumos.length > 0) {
-        await supabase.from('proveedores_insumos').insert(selectedInsumos.map(iid => ({ proveedor_id: proveedorId, insumo_id: iid })))
+        const { error: insInsumos } = await supabase.from('proveedores_insumos').insert(
+          selectedInsumos.map(iid => ({ proveedor_id: proveedorId, insumo_id: iid }))
+        )
+        if (insInsumos) throw new Error(`Error al guardar insumos: ${insInsumos.message}`)
       }
-      await supabase.from('proveedores_razas').delete().eq('proveedor_id', proveedorId)
+      const { error: delRazas } = await supabase.from('proveedores_razas').delete().eq('proveedor_id', proveedorId)
+      if (delRazas) throw new Error(`Error al actualizar razas: ${delRazas.message}`)
       if (selectedRazas.length > 0) {
-        await supabase.from('proveedores_razas').insert(selectedRazas.map(rid => ({ proveedor_id: proveedorId, raza_id: rid })))
+        const { error: insRazas } = await supabase.from('proveedores_razas').insert(
+          selectedRazas.map(rid => ({ proveedor_id: proveedorId, raza_id: rid }))
+        )
+        if (insRazas) throw new Error(`Error al guardar razas: ${insRazas.message}`)
       }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['proveedores'] })
+      qc.invalidateQueries({ queryKey: ['proveedor', id] })
+      qc.invalidateQueries({ queryKey: ['proveedor-insumos', id] })
+      qc.invalidateQueries({ queryKey: ['proveedor-razas', id] })
+      qc.invalidateQueries({ queryKey: ['proveedor-insumos-ids', id] })
+      qc.invalidateQueries({ queryKey: ['proveedor-razas-ids', id] })
       toast.success(isEdit ? 'Proveedor actualizado' : 'Proveedor registrado')
       navigate('/dashboard/proveedores')
     },
@@ -398,7 +465,7 @@ export default function ProveedorForm() {
           {/* ── Insumos y razas ── */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-7">
             <FormSection icon={Package} title={`Insumos que suministra (${selectedInsumos.length})`} gradient="from-amber-400 to-amber-600">
-              <CheckList
+              <GroupedCheckList
                 items={insumos || []}
                 selected={selectedInsumos}
                 onToggle={toggleInsumo}

@@ -1,4 +1,4 @@
-﻿import { useEffect } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -10,6 +10,7 @@ import { CATEGORIAS_INSUMO, UNIDADES_MEDIDA } from '../../../lib/utils'
 import Input from '../../../components/ui/Input'
 import Select from '../../../components/ui/Select'
 import Button from '../../../components/ui/Button'
+import { ConfirmModal } from '../../../components/ui/Modal'
 import PageHeader from '../../../components/ui/PageHeader'
 import toast from 'react-hot-toast'
 import {
@@ -150,8 +151,17 @@ export default function InsumoForm() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const { perfil } = useAuth()
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
 
-  const { register, handleSubmit, reset, watch, formState: { errors, isSubmitting } } = useForm({
+  function handleCancel() {
+    if (isDirty) {
+      setShowCancelConfirm(true)
+    } else {
+      navigate(isEdit ? `/dashboard/insumos/${id}` : '/dashboard/insumos')
+    }
+  }
+
+  const { register, handleSubmit, reset, watch, formState: { errors, isSubmitting, isDirty } } = useForm({
     resolver: zodResolver(schema),
     defaultValues: { estado: 'activo', stock_minimo: 0 },
   })
@@ -306,7 +316,7 @@ export default function InsumoForm() {
             <Button type="submit" loading={mutation.isPending || isSubmitting}>
               {isEdit ? 'Guardar cambios' : 'Crear insumo'}
             </Button>
-            <Button type="button" variant="secondary" onClick={() => navigate('/dashboard/insumos')}>
+            <Button type="button" variant="secondary" onClick={handleCancel}>
               Cancelar
             </Button>
           </div>
@@ -322,6 +332,19 @@ export default function InsumoForm() {
           isEdit={isEdit}
         />
       </div>
+
+      <ConfirmModal
+        open={showCancelConfirm}
+        onClose={() => setShowCancelConfirm(false)}
+        onConfirm={() => navigate(isEdit ? `/dashboard/insumos/${id}` : '/dashboard/insumos')}
+        title={isEdit ? 'Cancelar edición' : 'Cancelar registro'}
+        message={
+          isEdit
+            ? '¿Estás seguro de que deseas cancelar? Los cambios realizados no se guardarán.'
+            : '¿Estás seguro de que deseas cancelar? Los datos ingresados se perderán.'
+        }
+        confirmLabel="Sí, cancelar"
+      />
     </div>
   )
 }

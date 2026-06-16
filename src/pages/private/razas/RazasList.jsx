@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -111,8 +111,27 @@ export default function RazasList({ embedded = false }) {
     },
   })
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm({
+  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm({
     resolver: zodResolver(schema),
+  })
+
+  const nombreValue = watch('nombre')
+  const [nombreDebounced, setNombreDebounced] = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => setNombreDebounced(nombreValue?.trim() || ''), 400)
+    return () => clearTimeout(t)
+  }, [nombreValue])
+
+  const { data: nombreDuplicado } = useQuery({
+    queryKey: ['raza-nombre-check', nombreDebounced, modal?.id],
+    queryFn: async () => {
+      let q = supabase.from('razas').select('id', { count: 'exact', head: true })
+        .ilike('nombre', nombreDebounced)
+      if (modal?.id) q = q.neq('id', modal.id)
+      const { count } = await q
+      return (count || 0) > 0
+    },
+    enabled: nombreDebounced.length > 0,
   })
 
   const saveMutation = useMutation({
@@ -288,7 +307,7 @@ export default function RazasList({ embedded = false }) {
         footer={
           <>
             <Button variant="secondary" onClick={() => setModal(null)}>Cancelar</Button>
-            <Button onClick={handleSubmit(v => saveMutation.mutate(v))} loading={saveMutation.isPending}>
+            <Button onClick={handleSubmit(v => saveMutation.mutate(v))} loading={saveMutation.isPending} disabled={!!nombreDuplicado}>
               {modal?.id ? 'Guardar cambios' : 'Crear raza'}
             </Button>
           </>
@@ -298,7 +317,7 @@ export default function RazasList({ embedded = false }) {
           <Input
             label="Nombre de la raza"
             placeholder="Ej: Hy-Line Brown, ISA Brown…"
-            error={errors.nombre?.message}
+            error={errors.nombre?.message || (nombreDuplicado ? 'Ya existe una raza con este nombre' : undefined)}
             {...register('nombre')}
           />
           <Textarea

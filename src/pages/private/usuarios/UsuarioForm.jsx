@@ -255,7 +255,7 @@ export default function UsuarioForm() {
     const valor = (emailValue || '').trim().toLowerCase()
     if (!valor || !emailsExistentes?.length) return ''
     const existe = emailsExistentes.find(p => p.email?.toLowerCase() === valor && p.id !== id)
-    return existe ? 'Este correo ya está registrado en el sistema' : ''
+    return existe ? 'Este correo ya está   en el sistema' : ''
   }, [emailValue, emailsExistentes, id])
 
   /* ── Galpones ── */

@@ -114,7 +114,7 @@ export default function Sidebar({ open, onClose }) {
           ${open ? 'translate-x-0' : '-translate-x-full'}
           lg:translate-x-0 lg:static lg:z-auto
         `}
-      >
+      > 
         {/* Logo */}
         <div className="flex items-center justify-between px-4 py-4 border-b border-stone-200 dark:border-stone-800">
           <div className="flex items-center gap-2.5">
