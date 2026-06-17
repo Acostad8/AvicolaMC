@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+  <defs>
+    <linearGradient id="egg" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0%" stop-color="#fef9c3"/>
+      <stop offset="100%" stop-color="#fde68a"/>
+    </linearGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#d97706"/>
+      <stop offset="100%" stop-color="#92400e"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="12" fill="url(#bg)"/>
+  <!-- huevo -->
+  <ellipse cx="24" cy="27" rx="13" ry="16" fill="url(#egg)" stroke="#fbbf24" stroke-width="1"/>
+  <!-- brillo -->
+  <ellipse cx="19" cy="18" rx="4" ry="5" fill="rgba(255,255,255,0.45)" transform="rotate(-15 19 18)"/>
+</svg>
