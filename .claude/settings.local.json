@@ -55,7 +55,9 @@
       "Bash(node scripts/generate-screenshots.js)",
       "Bash(node scripts/generate-screenshots.cjs)",
       "Bash(node scripts/gen-hu45-50.cjs)",
-      "Bash(node scripts/gen-hu51.cjs)"
+      "Bash(node scripts/gen-hu51.cjs)",
+      "Read(//c/Users/USUARIO/Documents/**)",
+      "Bash(node \"C:\\\\Users\\\\USUARIO\\\\Documents\\\\generar_requerimientos.js\")"
     ]
   }
 }

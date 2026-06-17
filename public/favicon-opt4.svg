@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+  <defs>
+    <linearGradient id="bg4" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="100%" stop-color="#065f46"/>
+    </linearGradient>
+    <linearGradient id="pluma" x1="0" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#d1fae5"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="12" fill="url(#bg4)"/>
+  <!-- pluma -->
+  <path d="M24,6 Q36,12 34,26 Q32,36 24,43 Q22,34 23,24 Q24,14 24,6Z" fill="url(#pluma)" opacity="0.95"/>
+  <path d="M24,6 Q12,12 14,26 Q16,36 24,43 Q22,34 23,24 Q24,14 24,6Z" fill="white" opacity="0.6"/>
+  <!-- nervio central -->
+  <line x1="24" y1="8" x2="24" y2="43" stroke="#6ee7b7" stroke-width="1.2"/>
+  <!-- barbas derecha -->
+  <line x1="24" y1="15" x2="31" y2="20" stroke="#6ee7b7" stroke-width="0.8" opacity="0.7"/>
+  <line x1="24" y1="21" x2="32" y2="26" stroke="#6ee7b7" stroke-width="0.8" opacity="0.7"/>
+  <line x1="24" y1="27" x2="31" y2="32" stroke="#6ee7b7" stroke-width="0.8" opacity="0.7"/>
+  <line x1="24" y1="33" x2="29" y2="37" stroke="#6ee7b7" stroke-width="0.8" opacity="0.7"/>
+  <!-- barbas izquierda -->
+  <line x1="24" y1="15" x2="17" y2="20" stroke="#6ee7b7" stroke-width="0.8" opacity="0.7"/>
+  <line x1="24" y1="21" x2="16" y2="26" stroke="#6ee7b7" stroke-width="0.8" opacity="0.7"/>
+  <line x1="24" y1="27" x2="17" y2="32" stroke="#6ee7b7" stroke-width="0.8" opacity="0.7"/>
+  <line x1="24" y1="33" x2="19" y2="37" stroke="#6ee7b7" stroke-width="0.8" opacity="0.7"/>
+</svg>

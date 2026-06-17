@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+  <defs>
+    <linearGradient id="bg3" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="12" fill="url(#bg3)"/>
+  <!-- cuerpo -->
+  <ellipse cx="22" cy="32" rx="13" ry="10" fill="white" opacity="0.92"/>
+  <!-- ala -->
+  <ellipse cx="18" cy="31" rx="7" ry="4" fill="#fef3c7" transform="rotate(-15 18 31)"/>
+  <!-- cabeza -->
+  <circle cx="36" cy="20" r="8" fill="white" opacity="0.92"/>
+  <!-- cresta -->
+  <path d="M33,13 Q35,8 37,13 Q39,8 41,13" fill="#ef4444" stroke="none"/>
+  <!-- pico -->
+  <polygon points="44,19 48,22 44,25" fill="#f59e0b"/>
+  <!-- ojo -->
+  <circle cx="38" cy="19" r="2" fill="#1c1917"/>
+  <circle cx="38.7" cy="18.3" r="0.6" fill="white"/>
+  <!-- patas -->
+  <line x1="20" y1="42" x2="18" y2="46" stroke="#d97706" stroke-width="2" stroke-linecap="round"/>
+  <line x1="26" y1="42" x2="28" y2="46" stroke="#d97706" stroke-width="2" stroke-linecap="round"/>
+  <line x1="18" y1="46" x2="14" y2="46" stroke="#d97706" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="28" y1="46" x2="32" y2="46" stroke="#d97706" stroke-width="1.5" stroke-linecap="round"/>
+</svg>

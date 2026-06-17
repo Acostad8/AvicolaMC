@@ -90,19 +90,19 @@ async function fetchAdminData(supabase: any) {
       .order('fecha_ingreso', { ascending: false }).limit(200),
     supabase.from('produccion')
       .select('fecha, huevos_producidos, porcentaje_postura, consumo_alimento_kg, galpon:galpones(nombre), lote:lotes(nombre_numero)')
-      .gte('fecha', d90).order('fecha', { ascending: false }),
+      .gte('fecha', d90).order('fecha', { ascending: false }).limit(200),
     supabase.from('mortalidad')
       .select('fecha, cantidad_bajas, causa, galpon:galpones(nombre), lote:lotes(nombre_numero)')
-      .gte('fecha', d90).order('fecha', { ascending: false }),
+      .gte('fecha', d90).order('fecha', { ascending: false }).limit(150),
     supabase.from('insumos')
       .select('nombre, stock_actual, stock_minimo, unidad_medida, estado').order('nombre'),
     supabase.from('tratamientos')
       .select('tipo, estado, fecha_inicio, fecha_fin, galpon:galpones(nombre), lote:lotes(nombre_numero)')
-      .order('fecha_inicio', { ascending: false }).limit(100),
+      .order('fecha_inicio', { ascending: false }).limit(50),
     supabase.from('perfiles').select('nombre, rol').order('rol'),
     supabase.from('razas').select('nombre'),
-    supabase.from('produccion').select('huevos_producidos, consumo_alimento_kg').gte('fecha', d365),
-    supabase.from('mortalidad').select('cantidad_bajas, causa').gte('fecha', d365),
+    supabase.from('produccion').select('huevos_producidos, consumo_alimento_kg').gte('fecha', d365).limit(500),
+    supabase.from('mortalidad').select('cantidad_bajas, causa').gte('fecha', d365).limit(500),
   ])
 
   const galpones = galponesR.data ?? []
@@ -164,7 +164,7 @@ async function fetchAdminData(supabase: any) {
       ultimos_30_dias: { huevos: sum(prod30,  'huevos_producidos'),  alimento_kg: +sum(prod30,  'consumo_alimento_kg').toFixed(1) },
       ultimo_anio:     { huevos: sum(prodHist,'huevos_producidos'),  alimento_kg: +sum(prodHist,'consumo_alimento_kg').toFixed(1), dias_con_registro: prodHist.length },
       por_galpon_30d:  prodPorGalpon,
-      detalle_90d: prod90.slice(0, 90).map((r: any) => ({
+      detalle_90d: prod90.slice(0, 30).map((r: any) => ({
         fecha: r.fecha, galpon: r.galpon?.nombre, lote: r.lote?.nombre_numero,
         huevos: r.huevos_producidos, postura_pct: r.porcentaje_postura, alimento_kg: r.consumo_alimento_kg ?? 0,
       })),
@@ -288,7 +288,7 @@ FORMATO DE RESPUESTA:
 Hoy es ${farmData.fecha_hoy}.
 
 DATOS COMPLETOS DE LA GRANJA:
-${JSON.stringify(farmData, null, 2)}`
+${JSON.stringify(farmData)}`
       : `Eres el asistente de AvicolaMC, sistema de gestión avícola.
 Responde SOLO en español usando los datos exactos del contexto. NUNCA inventes cifras.
 
@@ -301,7 +301,7 @@ FORMATO:
 Hoy es ${farmData.fecha_hoy}.
 
 DATOS DE LA GRANJA:
-${JSON.stringify(farmData, null, 2)}`
+${JSON.stringify(farmData)}`
 
     const groqMessages = [
       { role: 'system', content: systemPrompt },
@@ -323,15 +323,19 @@ ${JSON.stringify(farmData, null, 2)}`
     })
 
     if (!groqRes.ok) {
-      const errBody = await groqRes.json()
-      const groqMsg = errBody?.error?.message ?? ''
+      let groqMsg = ''
+      try {
+        const errBody = await groqRes.json()
+        groqMsg = errBody?.error?.message ?? ''
+      } catch (_) { /* respuesta no-JSON de Groq */ }
+
       if (groqRes.status === 429) {
         throw new Error('El asistente alcanzó el límite de consultas por minuto. Espera unos segundos e intenta de nuevo.')
       }
       if (groqRes.status === 413 || groqMsg.toLowerCase().includes('context') || groqMsg.toLowerCase().includes('token')) {
         throw new Error('La conversación es demasiado larga. Limpia el historial con el ícono de papelera e intenta de nuevo.')
       }
-      throw new Error(`Error del asistente (${groqRes.status}). Intenta de nuevo en unos momentos.`)
+      throw new Error(groqMsg || `Error del asistente (${groqRes.status}). Intenta de nuevo en unos momentos.`)
     }
 
     const groqData = await groqRes.json()
@@ -342,8 +346,9 @@ ${JSON.stringify(farmData, null, 2)}`
     })
 
   } catch (err: any) {
-    console.error('chat-avicola error:', err.message)
-    return new Response(JSON.stringify({ error: err.message ?? 'Error interno' }), {
+    const message = err?.message || err?.toString() || 'Error interno del servidor'
+    console.error('chat-avicola error:', message)
+    return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
