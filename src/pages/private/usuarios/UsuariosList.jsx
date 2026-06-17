@@ -154,7 +154,7 @@ function UsuarioCard({ u }) {
             <Button variant="secondary" size="sm" icon={Eye} className="w-full justify-center">Ver</Button>
           </Link>
           <Link to={`/dashboard/usuarios/${u.id}/editar`} className="flex-1">
-            <Button variant="ghost" size="sm" icon={Pencil} className="w-full justify-center">Editar</Button>
+            <Button variant="secondary" size="sm" icon={Pencil} className="w-full justify-center">Editar</Button>
           </Link>
         </div>
       </div>
@@ -381,7 +381,7 @@ export default function UsuariosList() {
                             <Button variant="ghost" size="sm" icon={Eye}>Ver</Button>
                           </Link>
                           <Link to={`/dashboard/usuarios/${u.id}/editar`}>
-                            <Button variant="ghost" size="sm" icon={Pencil}>Editar</Button>
+                            <Button variant="secondary" size="sm" icon={Pencil}>Editar</Button>
                           </Link>
                         </div>
                       </td>

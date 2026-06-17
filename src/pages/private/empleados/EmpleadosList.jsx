@@ -68,7 +68,7 @@ function EmpleadoCard({ e }) {
             <Button variant="secondary" size="sm" icon={Eye} className="w-full justify-center">Ver perfil</Button>
           </Link>
           <Link to={`/dashboard/empleados/${e.id}/editar`}>
-            <Button variant="ghost" size="sm" icon={Pencil} />
+            <Button variant="secondary" size="sm" icon={Pencil} />
           </Link>
         </div>
       </div>
@@ -264,7 +264,7 @@ export default function EmpleadosList() {
                           <Button variant="ghost" size="sm" icon={Eye}>Ver</Button>
                         </Link>
                         <Link to={`/dashboard/empleados/${e.id}/editar`}>
-                          <Button variant="ghost" size="sm" icon={Pencil}>Editar</Button>
+                          <Button variant="secondary" size="sm" icon={Pencil}>Editar</Button>
                         </Link>
                       </div>
                     </td>
