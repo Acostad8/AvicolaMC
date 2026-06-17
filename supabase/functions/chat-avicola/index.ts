@@ -324,7 +324,14 @@ ${JSON.stringify(farmData, null, 2)}`
 
     if (!groqRes.ok) {
       const errBody = await groqRes.json()
-      throw new Error(`Groq ${groqRes.status}: ${errBody?.error?.message ?? JSON.stringify(errBody)}`)
+      const groqMsg = errBody?.error?.message ?? ''
+      if (groqRes.status === 429) {
+        throw new Error('El asistente alcanzó el límite de consultas por minuto. Espera unos segundos e intenta de nuevo.')
+      }
+      if (groqRes.status === 413 || groqMsg.toLowerCase().includes('context') || groqMsg.toLowerCase().includes('token')) {
+        throw new Error('La conversación es demasiado larga. Limpia el historial con el ícono de papelera e intenta de nuevo.')
+      }
+      throw new Error(`Error del asistente (${groqRes.status}). Intenta de nuevo en unos momentos.`)
     }
 
     const groqData = await groqRes.json()

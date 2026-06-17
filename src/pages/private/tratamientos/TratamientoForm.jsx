@@ -484,6 +484,7 @@ export default function TratamientoForm() {
       if (tratamiento?.insumo_id) {
         qc.invalidateQueries({ queryKey: ['movimientos-insumo', tratamiento.insumo_id] })
       }
+      qc.invalidateQueries({ queryKey: ['dashboard-v2'] })
       toast.success(isEdit ? 'Tratamiento actualizado' : 'Tratamiento registrado')
       navigate(isEdit ? `/dashboard/tratamientos/${id}` : '/dashboard/tratamientos')
     },

@@ -77,8 +77,7 @@ export function AuthProvider({ children }) {
       if (newSession?.user) {
         setSession(newSession)
         sessionRef.current = newSession
-        loadPerfil(newSession.user.id)
-        startEstadoPolling(newSession.user.id)
+        loadPerfil(newSession.user.id).then(() => startEstadoPolling(newSession.user.id))
       } else {
         // Sesión terminada: distinguir cierre manual de expiración involuntaria
         const wasManual = manualSignOutRef.current

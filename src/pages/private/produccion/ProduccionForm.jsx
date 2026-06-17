@@ -420,6 +420,7 @@ export default function ProduccionForm() {
       qc.invalidateQueries({ queryKey: ['produccion'] })
       qc.invalidateQueries({ queryKey: ['produccion-detalle', id] })
       qc.invalidateQueries({ queryKey: ['auditoria-produccion', id] })
+      qc.invalidateQueries({ queryKey: ['dashboard-v2'] })
       toast.success(isEdit ? 'Registro actualizado correctamente' : 'Producción registrada correctamente')
       navigate(isEdit ? `/dashboard/produccion/${id}` : '/dashboard/produccion')
     },

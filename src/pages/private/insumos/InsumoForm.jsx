@@ -216,6 +216,7 @@ export default function InsumoForm() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['insumos'] })
       qc.invalidateQueries({ queryKey: ['insumo', id] })
+      qc.invalidateQueries({ queryKey: ['dashboard-v2'] })
       toast.success(isEdit ? 'Insumo actualizado' : 'Insumo creado')
       navigate(isEdit ? `/dashboard/insumos/${id}` : '/dashboard/insumos')
     },

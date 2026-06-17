@@ -20,7 +20,7 @@ const schema = z.object({
   nombre_completo:     z.string().min(1, 'Requerido'),
   documento_identidad: z.string().optional(),
   cargo:               z.string().optional(),
-  telefono:            z.string().optional(),
+  telefono:            z.string().min(1, 'El teléfono es requerido'),
   fecha_ingreso:       z.string().optional(),
   estado:              z.enum(['activo', 'inactivo']),
   notas:               z.string().optional(),
@@ -51,17 +51,17 @@ function AvatarInitials({ name }) {
   )
 }
 
-function PreviewCard({ nombre, documento, cargo, telefono, fechaIngreso, estado, notas, isEdit }) {
+function PreviewCard({ nombre, documento, cargo, telefono, fechaIngreso, estado, notas, isEdit, telefonoDuplicado, documentoDuplicado }) {
   const estadoColor = estado === 'activo'
     ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
     : 'bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800'
 
   const checks = [
-    { ok: nombre?.length > 0,        text: 'Nombre completo' },
-    { ok: !!documento,               text: 'Documento de identidad' },
-    { ok: !!cargo,                   text: 'Cargo definido' },
-    { ok: !!telefono,                text: 'Teléfono registrado' },
-    { ok: !!fechaIngreso,            text: 'Fecha de ingreso' },
+    { ok: nombre?.length > 0,                          text: 'Nombre completo' },
+    { ok: !!documento && !documentoDuplicado,           text: 'Documento de identidad' },
+    { ok: !!cargo,                                     text: 'Cargo definido' },
+    { ok: !!telefono && !telefonoDuplicado,             text: 'Teléfono registrado' },
+    { ok: !!fechaIngreso,                              text: 'Fecha de ingreso' },
   ]
 
   return (
@@ -172,6 +172,30 @@ export default function EmpleadoForm() {
     enabled: isEdit,
   })
 
+  const { data: telefonoDuplicado } = useQuery({
+    queryKey: ['empleado-telefono', telefono, id],
+    queryFn: async () => {
+      let q = supabase.from('empleados').select('id').eq('telefono', telefono.trim())
+      if (isEdit) q = q.neq('id', id)
+      const { data } = await q.maybeSingle()
+      return !!data
+    },
+    enabled: !!telefono?.trim(),
+    staleTime: 30_000,
+  })
+
+  const { data: documentoDuplicado } = useQuery({
+    queryKey: ['empleado-documento', documento, id],
+    queryFn: async () => {
+      let q = supabase.from('empleados').select('id').eq('documento_identidad', documento.trim())
+      if (isEdit) q = q.neq('id', id)
+      const { data } = await q.maybeSingle()
+      return !!data
+    },
+    enabled: !!documento?.trim(),
+    staleTime: 30_000,
+  })
+
   useEffect(() => {
     if (empleado) reset({
       nombre_completo:     empleado.nombre_completo,
@@ -188,11 +212,13 @@ export default function EmpleadoForm() {
     mutationFn: async (values) => {
       const payload = { ...values, fecha_ingreso: values.fecha_ingreso || null }
       if (isEdit) {
-        const { error } = await supabase.from('empleados').update(payload).eq('id', id)
+        const { data, error } = await supabase.from('empleados').update(payload).eq('id', id)
         if (error) throw error
+        return data
       } else {
-        const { error } = await supabase.from('empleados').insert(payload)
+        const { data, error } = await supabase.from('empleados').insert(payload).select()
         if (error) throw error
+        return data
       }
     },
     onSuccess: () => {
@@ -200,7 +226,14 @@ export default function EmpleadoForm() {
       toast.success(isEdit ? 'Empleado actualizado' : 'Empleado creado')
       navigate('/dashboard/empleados')
     },
-    onError: e => toast.error(e.message),
+    onError: e => {
+      const code = e?.code ?? e?.status ?? ''
+      const msg  = [e?.message, e?.details, e?.hint].filter(Boolean).join(' ')
+      if (String(code) === '23505' || msg.includes('unique') || msg.includes('idx_empleados_telefono'))
+        toast.error('Este número de teléfono ya está registrado en otro empleado')
+      else
+        toast.error(msg || 'Error al guardar el empleado')
+    },
   })
 
   return (
@@ -246,6 +279,7 @@ export default function EmpleadoForm() {
               <Input
                 label="Documento de identidad (opcional)"
                 placeholder="Cédula, NIT…"
+                error={documentoDuplicado ? 'Este documento ya está registrado en otro empleado' : undefined}
                 {...register('documento_identidad')}
               />
               <Input
@@ -260,8 +294,9 @@ export default function EmpleadoForm() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-7">
             <FormSection icon={Phone} title="Contacto" gradient="from-green-400 to-green-600">
               <Input
-                label="Teléfono (opcional)"
+                label="Teléfono"
                 placeholder="+57 300 000 0000"
+                error={telefonoDuplicado ? 'Este número ya está registrado en otro empleado' : errors.telefono?.message}
                 {...register('telefono')}
               />
             </FormSection>
@@ -295,7 +330,7 @@ export default function EmpleadoForm() {
 
           {/* Acciones */}
           <div className="flex gap-3 pt-2 border-t border-stone-100 dark:border-stone-800">
-            <Button type="submit" loading={mutation.isPending || isSubmitting}>
+            <Button type="submit" loading={mutation.isPending || isSubmitting} disabled={!!telefonoDuplicado || !!documentoDuplicado}>
               {isEdit ? 'Guardar cambios' : 'Crear empleado'}
             </Button>
             <Button type="button" variant="secondary" onClick={() => navigate('/dashboard/empleados')}>
@@ -314,6 +349,8 @@ export default function EmpleadoForm() {
           estado={estado}
           notas={notas}
           isEdit={isEdit}
+          telefonoDuplicado={telefonoDuplicado}
+          documentoDuplicado={documentoDuplicado}
         />
       </div>
     </div>

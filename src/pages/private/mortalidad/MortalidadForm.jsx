@@ -327,6 +327,8 @@ export default function MortalidadForm() {
       qc.invalidateQueries({ queryKey: ['mortalidad'] })
       qc.invalidateQueries({ queryKey: ['mortalidad-detalle', id] })
       qc.invalidateQueries({ queryKey: ['lotes'] })
+      qc.invalidateQueries({ queryKey: ['lote-activo'] })
+      qc.invalidateQueries({ queryKey: ['dashboard-v2'] })
       toast.success(isEdit ? 'Registro actualizado correctamente' : 'Mortalidad registrada correctamente')
       navigate(isEdit ? `/dashboard/mortalidad/${id}` : '/dashboard/mortalidad')
     },

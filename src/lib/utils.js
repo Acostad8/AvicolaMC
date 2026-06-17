@@ -32,7 +32,7 @@ export function calcWeeksAge(fechaIngreso) {
 
 export function calcPostura(huevos, aves) {
   if (!huevos || !aves || aves === 0) return 0
-  return ((huevos / aves) * 100).toFixed(2)
+  return parseFloat(((huevos / aves) * 100).toFixed(2))
 }
 
 export function downloadCSV(data, filename) {

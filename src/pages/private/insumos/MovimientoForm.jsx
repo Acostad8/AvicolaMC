@@ -258,6 +258,7 @@ export default function MovimientoForm() {
           qc.invalidateQueries({ queryKey: ['insumos-activos'] })
           qc.invalidateQueries({ queryKey: ['insumo', values.insumo_id] })
           qc.invalidateQueries({ queryKey: ['movimientos-insumo', values.insumo_id] })
+          qc.invalidateQueries({ queryKey: ['dashboard-v2'] })
           toast.success('Movimiento registrado correctamente')
           navigate('/dashboard/insumos')
         },

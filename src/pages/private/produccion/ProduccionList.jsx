@@ -138,70 +138,108 @@ export default function ProduccionList() {
     enabled: !!perfil,
   })
 
-  /* Fetch produccion — all filters applied server-side */
-  const { data: rawData, isLoading } = useQuery({
-    queryKey: ['produccion', isAdmin, perfil?.id, filterGalpon, filterLote, filterRaza, filterDesde, filterHasta],
+  /* Pre-resolver raza → lote IDs para que ambas queries lo compartan */
+  const { data: razaLoteIds } = useQuery({
+    queryKey: ['lotes-by-raza', filterRaza, filterGalpon, isAdmin, perfil?.id],
     queryFn: async () => {
-      let q = supabase.from('produccion').select(`
-        id, fecha, huevos_producidos, porcentaje_postura, consumo_alimento_kg, observaciones, created_at,
-        galpon:galpones(id, nombre),
-        lote:lotes(nombre_numero, cantidad_aves_actuales, raza:razas(nombre)),
-        registrado:perfiles(nombre_completo)
-      `).order('fecha', { ascending: false })
-
-      if (!isAdmin && galpones) {
-        const ids = (galpones || []).map(g => g.id)
-        if (ids.length === 0) return []
-        q = q.in('galpon_id', ids)
-      }
+      let q = supabase.from('lotes').select('id').eq('raza_id', filterRaza)
       if (filterGalpon) q = q.eq('galpon_id', filterGalpon)
-      if (filterLote)   q = q.eq('lote_id', filterLote)
-      if (filterDesde)  q = q.gte('fecha', filterDesde)
-      if (filterHasta)  q = q.lte('fecha', filterHasta)
+      else if (!isAdmin && galpones?.length) q = q.in('galpon_id', galpones.map(g => g.id))
+      const { data } = await q
+      return (data || []).map(l => l.id)
+    },
+    enabled: !!filterRaza && !!perfil && (isAdmin || galpones !== undefined),
+    staleTime: 60_000,
+  })
 
-      // Server-side raza filter: resolve lote_ids for the selected raza
-      if (filterRaza) {
-        let loteQ = supabase.from('lotes').select('id').eq('raza_id', filterRaza)
-        if (filterGalpon) {
-          loteQ = loteQ.eq('galpon_id', filterGalpon)
-        } else if (!isAdmin && galpones) {
-          const ids = (galpones || []).map(g => g.id)
-          if (ids.length) loteQ = loteQ.in('galpon_id', ids)
-        }
-        const { data: razaLotes } = await loteQ
-        const razaLoteIds = (razaLotes || []).map(l => l.id)
-        if (razaLoteIds.length === 0) return []
-        q = q.in('lote_id', razaLoteIds)
-      }
+  const baseEnabled  = !!perfil && (isAdmin || galpones !== undefined)
+  const queryEnabled = baseEnabled && (!filterRaza || razaLoteIds !== undefined)
+  const noRazaMatch  = !!(filterRaza && razaLoteIds?.length === 0)
 
+  /* Aplica los filtros comunes a un query builder; retorna null si el resultado es vacío garantizado */
+  function applyFilters(q) {
+    if (!isAdmin && galpones) {
+      const ids = galpones.map(g => g.id)
+      if (!ids.length) return null
+      q = q.in('galpon_id', ids)
+    }
+    if (filterGalpon) q = q.eq('galpon_id', filterGalpon)
+    if (filterLote)   q = q.eq('lote_id', filterLote)
+    if (filterDesde)  q = q.gte('fecha', filterDesde)
+    if (filterHasta)  q = q.lte('fecha', filterHasta)
+    if (filterRaza)   q = q.in('lote_id', razaLoteIds)
+    return q
+  }
+
+  /* Query de estadísticas — campos ligeros, límite 500, para KPIs + chart + export */
+  const { data: statsData, isLoading: statsLoading } = useQuery({
+    queryKey: ['produccion-stats', isAdmin, perfil?.id, filterGalpon, filterLote, filterRaza, filterDesde, filterHasta],
+    queryFn: async () => {
+      if (noRazaMatch) return []
+      let q = supabase.from('produccion')
+        .select(`
+          id, fecha, huevos_producidos, porcentaje_postura, consumo_alimento_kg, observaciones,
+          galpon:galpones(nombre),
+          lote:lotes(nombre_numero, raza:razas(nombre)),
+          registrado:perfiles(nombre_completo)
+        `)
+        .order('fecha', { ascending: false })
+        .limit(500)
+      q = applyFilters(q)
+      if (!q) return []
       const { data, error } = await q
       if (error) throw error
       return data || []
     },
-    enabled: !!perfil && (!(!isAdmin) || galpones !== undefined),
+    enabled: queryEnabled,
   })
 
-  const filteredData = rawData || []
+  /* Query paginada — registros completos con joins, paginación server-side */
+  const { data: tableResult, isLoading: tableLoading } = useQuery({
+    queryKey: ['produccion', isAdmin, perfil?.id, filterGalpon, filterLote, filterRaza, filterDesde, filterHasta, page, pageSize],
+    queryFn: async () => {
+      if (noRazaMatch) return { data: [], count: 0 }
+      let q = supabase.from('produccion')
+        .select(`
+          id, fecha, huevos_producidos, porcentaje_postura, consumo_alimento_kg, observaciones, created_at,
+          galpon:galpones(id, nombre),
+          lote:lotes(nombre_numero, cantidad_aves_actuales, raza:razas(nombre)),
+          registrado:perfiles(nombre_completo)
+        `, { count: 'exact' })
+        .order('fecha', { ascending: false })
+        .range((page - 1) * pageSize, page * pageSize - 1)
+      q = applyFilters(q)
+      if (!q) return { data: [], count: 0 }
+      const { data, count, error } = await q
+      if (error) throw error
+      return { data: data || [], count: count ?? 0 }
+    },
+    enabled: queryEnabled,
+  })
 
-  /* KPI calculations */
+  const isLoading  = statsLoading || tableLoading
+  const paginated  = tableResult?.data || []
+  const totalCount = tableResult?.count ?? 0
+  const totalPages = Math.ceil(totalCount / pageSize)
+
+  /* KPI calculations — sobre statsData (hasta 500 registros del período filtrado) */
   const kpis = useMemo(() => {
-    if (!filteredData.length) return null
-    const totalHuevos   = filteredData.reduce((s, r) => s + (r.huevos_producidos || 0), 0)
-    const totalAlimento = filteredData.reduce((s, r) => s + (r.consumo_alimento_kg || 0), 0)
-    const avgPostura    = filteredData.reduce((s, r) => s + (r.porcentaje_postura || 0), 0) / filteredData.length
-    const avgDiario     = totalHuevos / filteredData.length
-    const mejorDia      = filteredData.reduce((b, r) => r.huevos_producidos > (b?.huevos_producidos || 0) ? r : b, null)
+    if (!statsData?.length) return null
+    const totalHuevos   = statsData.reduce((s, r) => s + (r.huevos_producidos || 0), 0)
+    const totalAlimento = statsData.reduce((s, r) => s + (r.consumo_alimento_kg || 0), 0)
+    const avgPostura    = statsData.reduce((s, r) => s + (r.porcentaje_postura || 0), 0) / statsData.length
+    const avgDiario     = totalHuevos / statsData.length
+    const mejorDia      = statsData.reduce((b, r) => r.huevos_producidos > (b?.huevos_producidos || 0) ? r : b, null)
     const pesoHuevoKg   = (config.produccion?.peso_promedio_huevo_g ?? 60) / 1000
     const fcr           = (totalAlimento > 0 && totalHuevos > 0)
       ? (totalAlimento / (totalHuevos * pesoHuevoKg)).toFixed(2)
       : '—'
+    return { totalHuevos, totalAlimento, avgPostura, avgDiario, mejorDia, fcr, dias: statsData.length }
+  }, [statsData, config.produccion?.peso_promedio_huevo_g])
 
-    return { totalHuevos, totalAlimento, avgPostura, avgDiario, mejorDia, fcr, dias: filteredData.length }
-  }, [filteredData, config.produccion?.peso_promedio_huevo_g])
-
-  /* Chart data: sorted ascending, last 30 records */
+  /* Chart data — últimos 30 del período, ordenados ascendente */
   const chartData = useMemo(() =>
-    [...filteredData]
+    [...(statsData || [])]
       .sort((a, b) => a.fecha.localeCompare(b.fecha))
       .slice(-30)
       .map(r => ({
@@ -209,11 +247,7 @@ export default function ProduccionList() {
         huevos:  r.huevos_producidos,
         postura: parseFloat(r.porcentaje_postura) || 0,
       }))
-  , [filteredData])
-
-  /* Paginated table */
-  const totalPages = Math.ceil(filteredData.length / pageSize)
-  const paginated  = filteredData.slice((page - 1) * pageSize, page * pageSize)
+  , [statsData])
 
   /* Active filters */
   const activeFilters = [
@@ -229,8 +263,8 @@ export default function ProduccionList() {
   }
 
   function handleExport() {
-    if (!filteredData.length) return
-    downloadCSV(filteredData.map(r => ({
+    if (!statsData?.length) return
+    downloadCSV(statsData.map(r => ({
       Fecha:                    r.fecha,
       'Galpón':                 r.galpon?.nombre,
       Lote:                     r.lote?.nombre_numero,
@@ -250,7 +284,7 @@ export default function ProduccionList() {
         breadcrumbs={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Producción' }]}
         actions={
           <div className="flex gap-2">
-            <Button variant="secondary" icon={Download} onClick={handleExport} disabled={!filteredData.length}>
+            <Button variant="secondary" icon={Download} onClick={handleExport} disabled={!statsData?.length}>
               Exportar CSV
             </Button>
             <Link to="/dashboard/produccion/nuevo">
@@ -511,7 +545,7 @@ export default function ProduccionList() {
             </table>
           </div>
         )}
-        {filteredData.length > 0 && (
+        {totalCount > 0 && (
           <Pagination
             page={page}
             totalPages={totalPages}

@@ -1,8 +1,9 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
-const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-avicola`
-const SESSION_KEY = 'avicola_chat_v1'
+const FUNCTIONS_URL  = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-avicola`
+const SESSION_KEY    = 'avicola_chat_v1'
+const MAX_HISTORY    = 10   // máximo de mensajes enviados al modelo por request
 
 function loadMessages() {
   try {
@@ -41,6 +42,7 @@ export function useChat() {
         body: JSON.stringify({
           messages: msgsWithUser
             .filter(m => !m.error)
+            .slice(-MAX_HISTORY)
             .map(({ role, content }) => ({ role, content })),
         }),
       })
