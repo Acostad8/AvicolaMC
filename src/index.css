@@ -41,6 +41,12 @@
   from { transform: translateX(100%); }
   to   { transform: translateX(0); }
 }
+@keyframes float-slow {
+  0%,100% { transform: translate(0,0); }
+  50%     { transform: translate(0,-10px); }
+}
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
 
 .animate-fade-in-up   { animation: fadeInUp 0.65s ease-out both; }
 .animate-blob         { animation: blob 8s infinite ease-in-out; }
