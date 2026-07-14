@@ -5,9 +5,9 @@ import {
   Bird, Building2, Egg, Skull, Syringe, Package, BarChart3,
   CheckCircle2, ChevronDown, Menu, X, ArrowUp,
   Users, TrendingUp, Shield, Clock, Star, Activity,
-  Zap, FileText, Database, Bell, LayoutDashboard, AlertTriangle, Boxes,
+  Zap, FileText, Database, LayoutDashboard, AlertTriangle, Boxes,
   Sun, Sunrise, Sunset, Moon, Briefcase, HardHat,
-  Sparkles, Mail, MessageCircle, Send, Phone, AtSign, Globe, HelpCircle, Plus, Minus,
+  Sparkles, Mail, MessageCircle, Send, Globe, HelpCircle,
   Wifi, ThumbsUp, ThumbsDown, MessageSquare, Search
 } from 'lucide-react'
 import { useA11y } from '../../context/AccessibilityContext'
@@ -108,41 +108,6 @@ function ScrollProgressBar() {
       className="fixed top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-primary-500 via-amber-500 to-orange-500 z-[60] pointer-events-none"
       aria-hidden="true"
     />
-  )
-}
-
-/* ── Announcement bar ── */
-function AnnouncementBar({ onScrollTo }) {
-  const KEY = 'avicola-mc-announce-v1'
-  const [hidden, setHidden] = useState(() => {
-    if (typeof window === 'undefined') return false
-    try { return localStorage.getItem(KEY) === 'dismissed' } catch { return false }
-  })
-  if (hidden) return null
-  const close = () => {
-    try { localStorage.setItem(KEY, 'dismissed') } catch {}
-    setHidden(true)
-  }
-  return (
-    <div className="relative bg-gradient-to-r from-primary-700 via-amber-600 to-orange-600 text-white text-xs sm:text-sm py-2 px-10 text-center z-[55]">
-      <span className="inline-flex items-center gap-2 flex-wrap justify-center">
-        <Sparkles className="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
-        <span className="font-medium">Nuevo: módulo de predicciones IA disponible</span>
-        <button
-          onClick={() => onScrollTo?.('features')}
-          className="underline underline-offset-2 font-bold hover:opacity-80 transition"
-        >
-          Ver más →
-        </button>
-      </span>
-      <button
-        onClick={close}
-        className="absolute right-3 top-1/2 -translate-y-1/2 hover:opacity-80 transition p-1"
-        aria-label="Cerrar aviso"
-      >
-        <X className="w-4 h-4" />
-      </button>
-    </div>
   )
 }
 
