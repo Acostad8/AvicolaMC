@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../context/AuthContext'
+import { useViewMode } from '../../../hooks/useViewMode'
 import { formatNumber } from '../../../lib/utils'
 import {
   Plus, Eye, Pencil, Search, Building2, Users,
@@ -149,30 +150,23 @@ function GalponCard({ galpon, isAdmin, onToggle }) {
 
         <div className="flex items-center gap-1.5 pt-3 border-t border-stone-100 dark:border-stone-800 mt-auto">
           <Link to={`/dashboard/galpones/${galpon.id}`} className="flex-1">
-            <Button variant="" size="sm" icon={Eye} className="w-full justify-center text-xs border border-primary-500 dark:border-primary-400 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/25 active:bg-primary-100 dark:active:bg-primary-900/30">
+            <Button variant="secondary" size="sm" icon={Eye} className="w-full justify-center text-xs">
               Ver detalle
             </Button>
           </Link>
           {isAdmin && (
             <>
               <Link to={`/dashboard/galpones/${galpon.id}/editar`}>
-                <Button
-                  variant="" size="sm" icon={Pencil} aria-label="Editar"
-                  className="border border-blue-400 dark:border-blue-500 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/25"
-                />
+                <Button variant="secondary" size="sm" icon={Pencil} aria-label="Editar" />
               </Link>
               {!enProduccion && (
                 <Button
-                  variant="" size="sm"
+                  variant="secondary" size="sm"
                   onClick={() => onToggle(galpon)}
                   icon={disponible ? Wrench : CheckCircle2}
-                  className={disponible
-                    ? 'border border-blue-400 dark:border-blue-500 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/25'
-                    : 'border border-emerald-500 dark:border-emerald-500 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/25'
-                  }
-                >
-                  {disponible ? 'Mantenimiento' : 'Disponible'}
-                </Button>
+                  aria-label={disponible ? 'Poner en mantenimiento' : 'Marcar como disponible'}
+                  title={disponible ? 'Poner en mantenimiento' : 'Marcar como disponible'}
+                />
               )}
             </>
           )}
@@ -188,7 +182,7 @@ export default function GalponesList() {
   const qc = useQueryClient()
   const [search, setSearch]             = useState('')
   const [filterEstado, setFilterEstado] = useState('')
-  const [view, setView]                 = useState('cards')
+  const [view, setView]                 = useViewMode('galpones', 'cards')
   const [page, setPage]                 = useState(1)
   const [pageSize, setPageSize]         = useState(12)
   const [confirm, setConfirm]           = useState(null)
@@ -437,30 +431,21 @@ export default function GalponesList() {
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1">
                             <Link to={`/dashboard/galpones/${g.id}`}>
-                              <Button variant="ghost" size="sm" icon={Eye}>Ver</Button>
+                              <Button variant="secondary" size="sm" icon={Eye}>Ver</Button>
                             </Link>
                             {isAdmin && (
                               <>
                                 <Link to={`/dashboard/galpones/${g.id}/editar`}>
-                                  <Button
-                                    variant="" size="sm" icon={Pencil}
-                                    className="border border-blue-400 dark:border-blue-500 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/25"
-                                  >
-                                    Editar
-                                  </Button>
+                                  <Button variant="secondary" size="sm" icon={Pencil}>Editar</Button>
                                 </Link>
                                 {!enProduccion && (
                                   <Button
-                                    variant="" size="sm"
+                                    variant="secondary" size="sm"
                                     icon={disponible ? Wrench : CheckCircle2}
-                                    className={disponible
-                                      ? 'border border-blue-400 dark:border-blue-500 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/25'
-                                      : 'border border-emerald-500 dark:border-emerald-500 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/25'
-                                    }
                                     onClick={() => handleToggle(g)}
-                                  >
-                                    {disponible ? 'Mantenimiento' : 'Disponible'}
-                                  </Button>
+                                    aria-label={disponible ? 'Poner en mantenimiento' : 'Marcar como disponible'}
+                                    title={disponible ? 'Poner en mantenimiento' : 'Marcar como disponible'}
+                                  />
                                 )}
                               </>
                             )}

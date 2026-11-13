@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
@@ -10,7 +11,7 @@ import { Skeleton } from '../../../components/ui/Skeleton'
 import AuditHistorial from '../../../components/ui/AuditHistorial'
 import {
   Pencil, Download, Syringe, Pill, FlaskConical, Shield,
-  Bug, Activity, Building2, Calendar, CalendarCheck,
+  Bug, Activity, Building2, Calendar,
   User, ClipboardList, Package, Beaker, CheckCircle2, Clock3, Clock, Lock, ShieldCheck, AlertTriangle,
 } from 'lucide-react'
 import jsPDF from 'jspdf'
@@ -156,6 +157,7 @@ export default function TratamientoDetalle() {
   const { id }      = useParams()
   const { isAdmin } = useAuth()
   const { config }  = useConfig()
+  const [nowMs] = useState(() => Date.now())
   const umbralDias  = config.produccion?.umbral_dias_tratamiento ?? 7
 
   const { data: t, isLoading } = useQuery({
@@ -186,29 +188,113 @@ export default function TratamientoDetalle() {
   })
 
   function downloadPDF() {
-    const doc = new jsPDF()
+    const doc        = new jsPDF()
+    const g          = config.granja
+    const pageWidth  = doc.internal.pageSize.getWidth()
+    const pageHeight = doc.internal.pageSize.getHeight()
+    const now        = new Date()
+    const nowStr     = now.toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' })
+    const nombreGranja = g.nombre || 'Sistema de Gestión Avícola MC'
+    const reportLabel  = 'Registro de tratamiento veterinario'
+    const tipoLabelPDF = getLabelFromValue(TIPOS_TRATAMIENTO, t.tipo)
+
+    const PRIMARY = [217, 119, 6]
+    const DARK    = [41, 37, 36]
+    const MUTED   = [120, 113, 108]
+    const BORDER  = [230, 230, 230]
+    const ZEBRA   = [250, 250, 249]
+
+    // Header band
+    doc.setFillColor(...PRIMARY)
+    doc.rect(0, 0, pageWidth, 28, 'F')
+
+    doc.setFont('helvetica', 'bold')
     doc.setFontSize(16)
-    doc.text('Sistema de Gestión Avícola MC', 14, 20)
-    doc.setFontSize(12)
-    doc.text('Registro de Tratamiento Veterinario', 14, 30)
+    doc.setTextColor(255, 255, 255)
+    doc.text(nombreGranja, 14, 13)
+
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    const headerMeta = [
+      g.nit      ? `NIT ${g.nit}`      : null,
+      g.telefono ? `Tel ${g.telefono}` : null,
+      g.email    || null,
+    ].filter(Boolean).join('  ·  ')
+    if (headerMeta) doc.text(headerMeta, pageWidth - 14, 13, { align: 'right' })
+
+    doc.setFontSize(9)
+    doc.text('Sistema de gestión avícola', 14, 20.5)
+    const addr = [g.direccion, g.ciudad].filter(Boolean).join(', ')
+    if (addr) doc.text(addr, pageWidth - 14, 20.5, { align: 'right' })
+
+    doc.setFillColor(146, 64, 14)
+    doc.rect(0, 28, pageWidth, 1.5, 'F')
+
+    // Title
+    doc.setTextColor(...DARK)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(13)
+    doc.text(reportLabel.toUpperCase(), 14, 42)
+
+    // Meta
+    const metaRows = [
+      ['Tipo',     tipoLabelPDF],
+      ['ID',       id?.slice(0, 8) + '…'],
+      ['Generado', nowStr],
+    ]
+    doc.setFontSize(8.5)
+    let metaY = 50
+    metaRows.forEach(([lbl, val]) => {
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(...DARK)
+      doc.text(`${lbl}:`, 14, metaY)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(...MUTED)
+      doc.text(String(val || '—'), 36, metaY)
+      metaY += 4.8
+    })
+
+    doc.setDrawColor(...BORDER)
+    doc.setLineWidth(0.3)
+    doc.line(14, metaY + 1, pageWidth - 14, metaY + 1)
+
     autoTable(doc, {
-      startY: 40,
+      startY: metaY + 6,
       head:   [['Campo', 'Valor']],
       body:   [
-        ['Galpón',           t.galpon?.nombre || ''],
-        ['Lote',             t.lote?.nombre_numero || ''],
-        ['Fecha inicio',     formatDate(t.fecha_inicio)],
-        ['Fecha fin',        formatDate(t.fecha_fin)],
-        ['Tipo',             getLabelFromValue(TIPOS_TRATAMIENTO, t.tipo)],
-        ['Producto',         t.nombre_producto || ''],
+        ['Galpón',           t.galpon?.nombre || '—'],
+        ['Lote',             t.lote?.nombre_numero || '—'],
+        ['Fecha inicio',     formatDate(t.fecha_inicio) || '—'],
+        ['Fecha fin',        formatDate(t.fecha_fin) || '—'],
+        ['Tipo',             tipoLabelPDF],
+        ['Producto',         t.nombre_producto || '—'],
         ['Cantidad usada',   t.cantidad_usada != null ? String(t.cantidad_usada) : '—'],
-        ['Dosis/Aplicación', t.dosis_aplicacion || ''],
-        ['Responsable',      t.responsable || ''],
-        ['Estado',           t.estado || ''],
-        ['Observaciones',    t.observaciones || ''],
+        ['Dosis/Aplicación', t.dosis_aplicacion || '—'],
+        ['Responsable',      t.responsable || '—'],
+        ['Estado',           t.estado || '—'],
+        ['Observaciones',    t.observaciones || '—'],
       ],
+      styles: { fontSize: 9, cellPadding: 3, lineColor: BORDER, lineWidth: 0.1, textColor: DARK, overflow: 'linebreak' },
+      headStyles: { fillColor: PRIMARY, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9, halign: 'left', cellPadding: 3 },
+      alternateRowStyles: { fillColor: ZEBRA },
+      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 50 } },
+      margin: { left: 14, right: 14, top: 10, bottom: 18 },
     })
-    doc.save(`tratamiento-${id}.pdf`)
+
+    const totalPagesT = doc.getNumberOfPages()
+    for (let i = 1; i <= totalPagesT; i++) {
+      doc.setPage(i)
+      doc.setDrawColor(...BORDER)
+      doc.setLineWidth(0.3)
+      doc.line(14, pageHeight - 12, pageWidth - 14, pageHeight - 12)
+      doc.setFontSize(7.5)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(...MUTED)
+      doc.text(`${nombreGranja}  ·  ${reportLabel}`, 14, pageHeight - 7)
+      doc.text(`Página ${i} de ${totalPagesT}`, pageWidth - 14, pageHeight - 7, { align: 'right' })
+    }
+
+    doc.save(`tratamiento-${id}-${now.toISOString().slice(0, 10)}.pdf`)
   }
 
   if (isLoading) return <LoadingSkeleton />
@@ -220,11 +306,11 @@ export default function TratamientoDetalle() {
   const isActivo    = t.estado === 'activo'
   const hasFechaFin = !!t.fecha_fin
   const diasActivo  = t.fecha_inicio
-    ? Math.floor((Date.now() - new Date(t.fecha_inicio + 'T00:00:00').getTime()) / 86_400_000)
+    ? Math.floor((nowMs - new Date(t.fecha_inicio + 'T00:00:00').getTime()) / 86_400_000)
     : 0
   const isProlongado = isActivo && diasActivo > umbralDias
 
-  const msTranscurridos = t.created_at ? Date.now() - new Date(t.created_at).getTime() : Infinity
+  const msTranscurridos = t.created_at ? nowMs - new Date(t.created_at).getTime() : Infinity
   const dentroDeVentana = msTranscurridos <= 86_400_000
   const canEdit         = isAdmin || dentroDeVentana
   const msRestantes     = Math.max(0, 86_400_000 - msTranscurridos)

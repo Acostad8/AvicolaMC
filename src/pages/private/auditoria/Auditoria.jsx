@@ -311,34 +311,82 @@ export default function Auditoria() {
       q = buildQuery(q, applied)
       const { data: rows } = await q
 
-      const doc = new jsPDF({ orientation: 'landscape' })
-      const g   = config.granja
+      const doc        = new jsPDF({ orientation: 'landscape' })
+      const g          = config.granja
+      const pageWidth  = doc.internal.pageSize.getWidth()
+      const pageHeight = doc.internal.pageSize.getHeight()
+      const now        = new Date()
+      const nowStr     = now.toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' })
       const nombreGranja = g.nombre || 'Sistema de Gestión Avícola MC'
-      const now = new Date().toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })
+      const reportLabel  = 'Auditoría del sistema'
 
-      doc.setFontSize(16)
+      const PRIMARY = [217, 119, 6]
+      const ACCENT  = [79, 70, 229]
+      const DARK    = [41, 37, 36]
+      const MUTED   = [120, 113, 108]
+      const BORDER  = [230, 230, 230]
+      const ZEBRA   = [250, 250, 249]
+
+      // Header band
+      doc.setFillColor(...PRIMARY)
+      doc.rect(0, 0, pageWidth, 26, 'F')
+
       doc.setFont('helvetica', 'bold')
-      doc.text(`Auditoría del Sistema — ${nombreGranja}`, 14, 18)
-      doc.setFontSize(9)
+      doc.setFontSize(16)
+      doc.setTextColor(255, 255, 255)
+      doc.text(nombreGranja, 14, 12)
+
       doc.setFont('helvetica', 'normal')
-      doc.setTextColor(120)
-      const metaLineas = [
-        g.nit      ? `NIT: ${g.nit}`                                                : null,
-        g.direccion ? `${g.direccion}${g.ciudad ? `, ${g.ciudad}` : ''}`            : g.ciudad || null,
-        g.telefono  ? `Tel: ${g.telefono}`                                           : null,
-        g.email     ? `Correo: ${g.email}`                                           : null,
-      ].filter(Boolean)
-      if (metaLineas.length > 0) {
-        doc.text(metaLineas.join('  ·  '), 14, 24)
-      }
-      doc.text(`Generado: ${now}  ·  Total registros: ${rows?.length || 0}`, 14, metaLineas.length > 0 ? 30 : 25)
-      doc.setTextColor(0)
+      doc.setFontSize(8)
+      const headerMeta = [
+        g.nit      ? `NIT ${g.nit}`      : null,
+        g.telefono ? `Tel ${g.telefono}` : null,
+        g.email    || null,
+      ].filter(Boolean).join('  ·  ')
+      if (headerMeta) doc.text(headerMeta, pageWidth - 14, 12, { align: 'right' })
+
+      doc.setFontSize(9)
+      doc.text('Sistema de gestión avícola', 14, 19)
+      const addr = [g.direccion, g.ciudad].filter(Boolean).join(', ')
+      if (addr) doc.text(addr, pageWidth - 14, 19, { align: 'right' })
+
+      doc.setFillColor(146, 64, 14)
+      doc.rect(0, 26, pageWidth, 1.5, 'F')
+
+      // Title
+      doc.setTextColor(...DARK)
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(13)
+      doc.text(reportLabel.toUpperCase(), 14, 38)
+
+      // Meta rows
+      const metaRows = [
+        ['Generado',  nowStr],
+        ['Registros', String(rows?.length || 0)],
+        ['Filtros',   hasActiveFilters ? 'Aplicados' : 'Sin filtros'],
+      ]
+      doc.setFontSize(8.5)
+      let metaY = 46
+      metaRows.forEach(([lbl, val]) => {
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(...DARK)
+        doc.text(`${lbl}:`, 14, metaY)
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(...MUTED)
+        doc.text(String(val), 36, metaY)
+        metaY += 4.8
+      })
+
+      doc.setDrawColor(...BORDER)
+      doc.setLineWidth(0.3)
+      doc.line(14, metaY, pageWidth - 14, metaY)
 
       autoTable(doc, {
-        startY: metaLineas.length > 0 ? 36 : 30,
-        styles: { fontSize: 8, cellPadding: 3 },
-        headStyles: { fillColor: [79, 70, 229], textColor: 255, fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [248, 248, 248] },
+        startY: metaY + 4,
+        styles: { fontSize: 8, cellPadding: 2.8, lineColor: BORDER, lineWidth: 0.1, textColor: DARK, overflow: 'linebreak' },
+        headStyles: { fillColor: ACCENT, textColor: 255, fontStyle: 'bold', fontSize: 8.5, halign: 'left', cellPadding: 3 },
+        alternateRowStyles: { fillColor: ZEBRA },
+        margin: { left: 14, right: 14, top: 10, bottom: 15 },
         head: [['Fecha y hora', 'Usuario', 'Módulo', 'Operación', 'Registro ID', 'Descripción']],
         body: (rows || []).map(r => [
           formatDT(r.created_at),
@@ -350,7 +398,20 @@ export default function Auditoria() {
         ]),
       })
 
-      doc.save(`auditoria_${new Date().toISOString().slice(0, 10)}.pdf`)
+      const totalPagesAud = doc.getNumberOfPages()
+      for (let i = 1; i <= totalPagesAud; i++) {
+        doc.setPage(i)
+        doc.setDrawColor(...BORDER)
+        doc.setLineWidth(0.3)
+        doc.line(14, pageHeight - 10, pageWidth - 14, pageHeight - 10)
+        doc.setFontSize(7.5)
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(...MUTED)
+        doc.text(`${nombreGranja}  ·  ${reportLabel}`, 14, pageHeight - 5)
+        doc.text(`Página ${i} de ${totalPagesAud}`, pageWidth - 14, pageHeight - 5, { align: 'right' })
+      }
+
+      doc.save(`auditoria-${now.toISOString().slice(0, 10)}.pdf`)
     } catch {
       // jsPDF no disponible o fallo silencioso
     }

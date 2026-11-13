@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
+import { useViewMode } from '../../../hooks/useViewMode'
 import { formatDate } from '../../../lib/utils'
 import {
   Plus, Pencil, Eye, UserCog, Search, Shield,
@@ -168,7 +169,7 @@ export default function UsuariosList() {
   const [filterEstado, setFilterEstado] = useState('')
   const [page,         setPage]         = useState(1)
   const [pageSize,     setPageSize]     = useState(12)
-  const [view,         setView]         = useState('grid')
+  const [view,         setView]         = useViewMode('usuarios', 'grid')
 
   const { data, isLoading } = useQuery({
     queryKey: ['usuarios'],
@@ -179,7 +180,7 @@ export default function UsuariosList() {
     },
   })
 
-  const todos = data || []
+  const todos = useMemo(() => data || [], [data])
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim()

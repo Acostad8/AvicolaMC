@@ -99,7 +99,7 @@ async function fetchAdminData(supabase: any) {
     supabase.from('tratamientos')
       .select('tipo, estado, fecha_inicio, fecha_fin, galpon:galpones(nombre), lote:lotes(nombre_numero)')
       .order('fecha_inicio', { ascending: false }).limit(50),
-    supabase.from('perfiles').select('nombre, rol').order('rol'),
+    supabase.from('perfiles').select('nombre_completo, rol').order('rol'),
     supabase.from('razas').select('nombre'),
     supabase.from('produccion').select('huevos_producidos, consumo_alimento_kg').gte('fecha', d365).limit(500),
     supabase.from('mortalidad').select('cantidad_bajas, causa').gte('fecha', d365).limit(500),
@@ -211,7 +211,7 @@ async function fetchAdminData(supabase: any) {
       dias_desde_inicio: Math.floor((Date.now() - new Date(t.fecha_inicio + 'T00:00:00').getTime()) / 86400000),
     })),
 
-    personal: perfiles.map((p: any) => ({ nombre: p.nombre, rol: p.rol })),
+    personal: perfiles.map((p: any) => ({ nombre: p.nombre_completo, rol: p.rol })),
     razas: razas.map((r: any) => r.nombre),
   }
 }
@@ -254,7 +254,7 @@ Deno.serve(async (req) => {
 
     if (isAdmin) {
       farmData = await fetchAdminData(supabaseAdmin)
-      model    = 'llama-3.3-70b-versatile'
+      model    = 'openai/gpt-oss-120b'
     } else {
       const { data: galponesData } = await supabaseAdmin.from('galpones').select('id').eq('encargado_id', user.id)
       const galponIds: string[] = (galponesData ?? []).map((g: any) => g.id)

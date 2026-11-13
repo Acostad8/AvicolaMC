@@ -2,7 +2,6 @@ import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
-import { useA11y } from '../../context/AccessibilityContext'
 import { useConfig } from '../../context/ConfigContext'
 import { formatDate, downloadCSV, getLabelFromValue, CAUSAS_MORTALIDAD, TIPOS_TRATAMIENTO } from '../../lib/utils'
 import Button from '../../components/ui/Button'
@@ -23,7 +22,6 @@ const REPORTES = [
 
 export default function Reportes() {
   const { isAdmin, perfil } = useAuth()
-  const { dark } = useA11y()
   const { config } = useConfig()
 
   const [activeReport, setActiveReport] = useState('produccion')
@@ -34,6 +32,7 @@ export default function Reportes() {
   const [sortCol,      setSortCol]      = useState('score')
   const [sortDir,      setSortDir]      = useState('desc')
   const [page,         setPage]         = useState(0)
+  const [pdfLimit,     setPdfLimit]     = useState(100)
 
   const PAGE_SIZE = 25
 
@@ -273,47 +272,145 @@ export default function Reportes() {
   }
 
   function generatePDF() {
-    const doc = new jsPDF()
-    const g   = config.granja
+    const doc        = new jsPDF()
+    const g          = config.granja
+    const pageWidth  = doc.internal.pageSize.getWidth()
+    const pageHeight = doc.internal.pageSize.getHeight()
+    const now        = new Date()
+    const nowStr     = now.toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' })
+
     const nombreGranja = g.nombre || 'Sistema de Gestión Avícola MC'
-    const now = new Date().toLocaleDateString('es-CO')
-
-    doc.setFontSize(16)
-    doc.setFont('helvetica', 'bold')
-    doc.text(nombreGranja, 14, 20)
-
-    doc.setFontSize(12)
-    doc.setFont('helvetica', 'normal')
-    doc.text(activeReport === 'comparativa'
+    const reportLabel  = activeReport === 'comparativa'
       ? 'Comparativa de rendimiento entre galpones'
-      : `Reporte: ${REPORTES.find(r => r.id === activeReport)?.label}`, 14, 30)
+      : `Reporte de ${REPORTES.find(r => r.id === activeReport)?.label}`
 
+    const PRIMARY = [217, 119, 6]
+    const ACCENT  = activeReport === 'comparativa' ? [109, 40, 217] : PRIMARY
+    const DARK    = [41, 37, 36]
+    const MUTED   = [120, 113, 108]
+    const BORDER  = [230, 230, 230]
+    const ZEBRA   = [250, 250, 249]
+
+    // ── Header band ──
+    doc.setFillColor(...PRIMARY)
+    doc.rect(0, 0, pageWidth, 28, 'F')
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(16)
+    doc.setTextColor(255, 255, 255)
+    doc.text(nombreGranja, 14, 13)
+
+    doc.setFont('helvetica', 'normal')
     doc.setFontSize(8)
-    doc.setTextColor(120)
-    const metaLineas = [
-      g.nit       ? `NIT: ${g.nit}`                                                    : null,
-      g.direccion ? `${g.direccion}${g.ciudad ? `, ${g.ciudad}` : ''}`                 : g.ciudad || null,
-      g.telefono  ? `Tel: ${g.telefono}`                                                : null,
-      g.email     ? `Correo: ${g.email}`                                                : null,
-    ].filter(Boolean)
-    if (metaLineas.length > 0) {
-      doc.text(metaLineas.join('  ·  '), 14, 37)
-    }
-    doc.text(`Generado: ${now}`, 14, metaLineas.length > 0 ? 43 : 37)
-    doc.setTextColor(0)
+    const headerMeta = [
+      g.nit      ? `NIT ${g.nit}`      : null,
+      g.telefono ? `Tel ${g.telefono}` : null,
+      g.email    || null,
+    ].filter(Boolean).join('  ·  ')
+    if (headerMeta) doc.text(headerMeta, pageWidth - 14, 13, { align: 'right' })
 
-    const startY = metaLineas.length > 0 ? 50 : 44
-    const csvData = toCSVData()
-    if (csvData.length > 0) {
+    doc.setFontSize(9)
+    doc.text('Sistema de gestión avícola', 14, 20.5)
+    const addr = [g.direccion, g.ciudad].filter(Boolean).join(', ')
+    if (addr) doc.text(addr, pageWidth - 14, 20.5, { align: 'right' })
+
+    // Darker accent stripe
+    doc.setFillColor(146, 64, 14)
+    doc.rect(0, 28, pageWidth, 1.5, 'F')
+
+    // ── Report title ──
+    doc.setTextColor(...DARK)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(13)
+    doc.text(reportLabel.toUpperCase(), 14, 42)
+
+    // ── Meta rows (left) ──
+    const filterGalponName = galpones?.find(x => x.id === filterGalpon)?.nombre
+    const periodo = (filterDesde || filterHasta)
+      ? `${filterDesde || '—'}  a  ${filterHasta || 'hoy'}`
+      : 'Todos los registros'
+    const csvDataFull = toCSVData()
+    const totalRows   = csvDataFull.length
+    const limitedRows = pdfLimit === 'all' ? csvDataFull : csvDataFull.slice(0, pdfLimit)
+    const shownLabel  = pdfLimit === 'all' || totalRows <= limitedRows.length
+      ? `${totalRows} registros`
+      : `${limitedRows.length} de ${totalRows} registros`
+
+    const metaRows = [
+      ['Período',   periodo],
+      ['Galpón',    filterGalponName || 'Todos'],
+      ['Generado',  nowStr],
+      ['Usuario',   perfil?.nombre_completo || '—'],
+      ['Mostrando', shownLabel],
+    ]
+    doc.setFontSize(8.5)
+    let metaY = 50
+    metaRows.forEach(([lbl, val]) => {
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(...DARK)
+      doc.text(`${lbl}:`, 14, metaY)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(...MUTED)
+      doc.text(String(val), 36, metaY)
+      metaY += 4.8
+    })
+
+    // ── Summary stats (right) ──
+    const summaryList = summaryStats || []
+    let sumY = 50
+    summaryList.forEach(({ label, value }) => {
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(...DARK)
+      doc.setFontSize(10.5)
+      doc.text(String(value), pageWidth - 14, sumY, { align: 'right' })
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(...MUTED)
+      doc.setFontSize(7.5)
+      doc.text(label, pageWidth - 14, sumY + 4, { align: 'right' })
+      sumY += 10
+    })
+
+    // Divider
+    const dividerY = Math.max(metaY, sumY) + 1
+    doc.setDrawColor(...BORDER)
+    doc.setLineWidth(0.3)
+    doc.line(14, dividerY, pageWidth - 14, dividerY)
+
+    // ── Table ──
+    const startY = dividerY + 5
+    if (limitedRows.length > 0) {
       autoTable(doc, {
         startY,
-        head: [Object.keys(csvData[0])],
-        body: csvData.map(row => Object.values(row).map(v => String(v ?? ''))),
-        styles: { fontSize: 7 },
-        headStyles: { fillColor: activeReport === 'comparativa' ? [109, 40, 217] : [217, 119, 6] },
+        head: [Object.keys(limitedRows[0])],
+        body: limitedRows.map(row => Object.values(row).map(v => String(v ?? ''))),
+        styles: { fontSize: 7, cellPadding: 2.5, lineColor: BORDER, lineWidth: 0.1, textColor: DARK, overflow: 'linebreak' },
+        headStyles: { fillColor: ACCENT, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, halign: 'left', cellPadding: 3 },
+        alternateRowStyles: { fillColor: ZEBRA },
+        margin: { left: 14, right: 14, top: 10, bottom: 18 },
       })
+    } else {
+      doc.setFont('helvetica', 'italic')
+      doc.setFontSize(10)
+      doc.setTextColor(...MUTED)
+      doc.text('Sin datos para los filtros aplicados.', pageWidth / 2, startY + 20, { align: 'center' })
     }
-    doc.save(`reporte-${activeReport}.pdf`)
+
+    // ── Footer en todas las páginas ──
+    const total = doc.getNumberOfPages()
+    for (let i = 1; i <= total; i++) {
+      doc.setPage(i)
+      doc.setDrawColor(...BORDER)
+      doc.setLineWidth(0.3)
+      doc.line(14, pageHeight - 12, pageWidth - 14, pageHeight - 12)
+      doc.setFontSize(7.5)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(...MUTED)
+      doc.text(`${nombreGranja}  ·  ${reportLabel}`, 14, pageHeight - 7)
+      doc.text(`Página ${i} de ${total}`, pageWidth - 14, pageHeight - 7, { align: 'right' })
+    }
+
+    const filename = `reporte-${activeReport}-${now.toISOString().slice(0, 10)}.pdf`
+    doc.save(filename)
   }
 
   const hasExportData = activeReport === 'comparativa' ? sortedComparativa.length > 0 : !!reportData?.length
@@ -697,6 +794,22 @@ export default function Reportes() {
             <Button icon={Download} onClick={() => downloadCSV(toCSVData(), `reporte-${activeReport}`)} disabled={!hasExportData}>
               Descargar CSV
             </Button>
+            <div className="flex items-center gap-2">
+              <label htmlFor="pdf-limit" className="text-xs text-stone-500 dark:text-stone-400 whitespace-nowrap">Registros PDF:</label>
+              <select
+                id="pdf-limit"
+                className="input-base py-1.5 text-xs w-28"
+                value={pdfLimit}
+                onChange={e => setPdfLimit(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+                disabled={!hasExportData}
+              >
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value={250}>250</option>
+                <option value="all">Todos</option>
+              </select>
+            </div>
             <Button icon={FileText} variant="secondary" onClick={generatePDF} disabled={!hasExportData}>
               Descargar PDF
             </Button>

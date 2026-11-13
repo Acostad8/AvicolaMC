@@ -192,32 +192,35 @@ export default function Header({ title, onMenuToggle }) {
     : '?'
 
   return (
-    <header className="h-14 bg-white/90 dark:bg-stone-900/90 backdrop-blur-md border-b border-stone-200 dark:border-stone-800 flex items-center justify-between px-4 lg:px-6 sticky top-0 z-10 transition-colors duration-300">
+    <header className="h-16 bg-white/85 dark:bg-stone-900/85 backdrop-blur-md border-b border-stone-200 dark:border-stone-800 flex items-center justify-between px-4 lg:px-6 sticky top-0 z-10 transition-colors duration-300">
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 min-w-0">
         <button
           onClick={onMenuToggle}
-          className="lg:hidden text-stone-500 dark:text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 p-1.5 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
+          className="lg:hidden text-stone-500 dark:text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 p-2 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
           aria-label="Abrir menú"
         >
           <Menu className="h-5 w-5" aria-hidden="true" />
         </button>
-        <h1 className="text-base font-semibold text-stone-800 dark:text-stone-100">{title}</h1>
+        <div className="min-w-0">
+          <p className="hidden sm:block text-[10px] uppercase tracking-wider text-stone-400 dark:text-stone-500 leading-none mb-1">Panel</p>
+          <h1 className="text-base sm:text-lg font-semibold text-stone-800 dark:text-stone-100 truncate leading-tight">{title}</h1>
+        </div>
       </div>
 
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1">
 
         {/* ── Bell ── */}
         <div className="relative" ref={notifRef}>
           <button
             onClick={() => { setNotifOpen(v => !v); setUserOpen(false) }}
-            className="relative p-2 text-stone-400 dark:text-stone-500 hover:text-stone-600 dark:hover:text-stone-300 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
+            className="relative p-2 text-stone-500 dark:text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
             aria-label="Notificaciones"
             aria-expanded={notifOpen}
           >
             <Bell className="h-5 w-5" aria-hidden="true" />
             {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary-500 text-[10px] font-bold text-white leading-none">
+              <span className="absolute top-1 right-1 flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-primary-500 text-[10px] font-bold text-white leading-none ring-2 ring-white dark:ring-stone-900">
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
@@ -225,20 +228,28 @@ export default function Header({ title, onMenuToggle }) {
           {notifOpen && <NotificationPanel onClose={() => setNotifOpen(false)} />}
         </div>
 
+        {/* Divider */}
+        <div className="hidden sm:block h-6 w-px bg-stone-200 dark:bg-stone-800 mx-1" aria-hidden="true" />
+
         {/* ── User menu ── */}
         <div className="relative">
           <button
             onClick={() => { setUserOpen(v => !v); setNotifOpen(false) }}
             aria-expanded={userOpen}
             aria-haspopup="true"
-            className="flex items-center gap-2 pl-2 pr-2.5 py-1.5 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
+            className="flex items-center gap-2 pl-1.5 pr-2 py-1.5 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
           >
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow-sm">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow-sm shadow-primary-500/20">
               <span className="text-xs font-bold text-white select-none">{initials}</span>
             </div>
-            <span className="hidden sm:block text-sm font-medium text-stone-700 dark:text-stone-300 max-w-[120px] truncate">
-              {perfil?.nombre_completo?.split(' ')[0] || '—'}
-            </span>
+            <div className="hidden sm:flex flex-col items-start min-w-0 max-w-[140px]">
+              <span className="text-sm font-semibold text-stone-800 dark:text-stone-100 truncate leading-tight">
+                {perfil?.nombre_completo?.split(' ')[0] || '—'}
+              </span>
+              <span className="text-[10px] text-stone-500 dark:text-stone-400 capitalize truncate leading-tight mt-0.5">
+                {perfil?.rol || '—'}
+              </span>
+            </div>
             <ChevronDown className={`h-3.5 w-3.5 text-stone-400 transition-transform duration-200 ${userOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
           </button>
 
