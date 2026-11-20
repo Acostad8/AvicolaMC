@@ -10,7 +10,6 @@ import {
   ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ReferenceLine,
 } from 'recharts'
-import { useConfig } from '../../../context/ConfigContext'
 import {
   Egg, Package, TrendingUp, Target, AlertTriangle,
   Info, Building2, BarChart3,
@@ -48,20 +47,23 @@ function PrecisionBadge({ r2 }) {
 }
 
 /* ── Días de stock de alimento ── */
-function StockAlimentoCard({ insumos, consumoPromDiario, pesoSacoKg }) {
+function StockAlimentoCard({ insumos, consumoPromDiario }) {
+  const [nowMs] = useState(() => Date.now())
   if (!insumos?.length || consumoPromDiario <= 0) return null
 
-  const kgMap = {
-    kg: 1, kilogramo: 1, tonelada: 1000,
-    saco: pesoSacoKg, bulto: pesoSacoKg, costal: pesoSacoKg,
-  }
+  // Unidades auto-convertibles a kg. Para sacos/bultos requerimos kg_por_unidad del insumo.
+  const kgDirecto = { kg: 1, kilogramo: 1, tonelada: 1000 }
 
-  const insumosConvertidos = insumos.map(i => ({
-    ...i,
-    totalKg: kgMap[i.unidad_medida] != null
-      ? (i.stock_actual || 0) * kgMap[i.unidad_medida]
-      : null,
-  }))
+  const insumosConvertidos = insumos.map(i => {
+    const factor = Number(i.kg_por_unidad) > 0
+      ? Number(i.kg_por_unidad)
+      : (kgDirecto[i.unidad_medida] ?? null)
+    return {
+      ...i,
+      totalKg: factor != null ? (i.stock_actual || 0) * factor : null,
+      usaFactorPropio: Number(i.kg_por_unidad) > 0,
+    }
+  })
 
   const totalKg      = insumosConvertidos.reduce((s, i) => s + (i.totalKg ?? 0), 0)
   const hayNoConvert = insumosConvertidos.some(i => i.totalKg === null)
@@ -70,16 +72,14 @@ function StockAlimentoCard({ insumos, consumoPromDiario, pesoSacoKg }) {
 
   const diasRestantes  = totalKg > 0 ? Math.floor(totalKg / consumoPromDiario) : 0
   const fechaAgotamiento = totalKg > 0
-    ? new Date(Date.now() + diasRestantes * 86400000).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
+    ? new Date(nowMs + diasRestantes * 86400000).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
     : null
 
   const color = diasRestantes >= 14 ? 'text-green-600 dark:text-green-400'
     : diasRestantes >= 7  ? 'text-amber-600 dark:text-amber-400'
     : 'text-red-600 dark:text-red-400'
   const dot = diasRestantes >= 14 ? 'bg-green-500' : diasRestantes >= 7 ? 'bg-amber-500' : 'bg-red-500'
-  const usaSacos = insumosConvertidos.some(
-    i => ['saco', 'bulto', 'costal'].includes(i.unidad_medida) && i.totalKg != null
-  )
+  const usaFactorPropio = insumosConvertidos.some(i => i.usaFactorPropio)
 
   return (
     <div className="card p-4 space-y-3">
@@ -117,19 +117,18 @@ function StockAlimentoCard({ insumos, consumoPromDiario, pesoSacoKg }) {
       </div>
 
       {/* Notas de conversión */}
-      {(usaSacos || hayNoConvert) && (
+      {(usaFactorPropio || hayNoConvert) && (
         <div className="space-y-1.5 pt-1 border-t border-stone-100 dark:border-stone-800">
-          {usaSacos && (
+          {usaFactorPropio && (
             <p className="text-[11px] text-stone-400 dark:text-stone-500 flex items-center gap-1.5">
               <Package className="h-3 w-3 flex-shrink-0" />
-              Sacos/bultos/costales convertidos a <span className="font-semibold text-stone-600 dark:text-stone-300">{pesoSacoKg} kg/unidad</span>
-              <span className="text-stone-300 dark:text-stone-600">· ajustable en Configuración → Producción</span>
+              Conversión por insumo usando el factor <span className="font-semibold text-stone-600 dark:text-stone-300">kg/unidad</span> de cada producto
             </p>
           )}
           {hayNoConvert && (
             <p className="text-[11px] text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
               <AlertTriangle className="h-3 w-3 flex-shrink-0" />
-              Algunos insumos tienen unidades no convertibles a kg y fueron excluidos del cálculo
+              Algunos insumos sin factor <strong>kg/unidad</strong> fueron excluidos. Editalos en Insumos y setealos.
             </p>
           )}
         </div>
@@ -161,7 +160,6 @@ function SinDatos({ galpones }) {
 export default function Predicciones() {
   const { isAdmin, perfil } = useAuth()
   const { dark }            = useA11y()
-  const { config }          = useConfig()
 
   const [galponId,  setGalponId]  = useState('todos')
   const [horizonte, setHorizonte] = useState(14)
@@ -496,7 +494,6 @@ export default function Predicciones() {
         <StockAlimentoCard
           insumos={data.stockAlimento}
           consumoPromDiario={data.consumoPromDiario}
-          pesoSacoKg={config.produccion?.peso_saco_kg ?? 40}
         />
       )}
 

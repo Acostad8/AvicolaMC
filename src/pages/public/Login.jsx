@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
   Eye, EyeOff, Bird, ArrowLeft, Mail, Lock,
-  CheckCircle2, BarChart3, Package, Egg, AlertCircle
+  BarChart3, Package, Egg, AlertCircle
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useA11y } from '../../context/AccessibilityContext'

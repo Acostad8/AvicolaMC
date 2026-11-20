@@ -1,0 +1,26 @@
+flowchart TD
+    classDef inicio fill:#86efac,stroke:#166534,color:#000
+    classDef fin fill:#fca5a5,stroke:#991b1b,color:#000
+    classDef usuario fill:#93c5fd,stroke:#1e40af,color:#000
+    classDef sistema fill:#86efac,stroke:#166534,color:#000
+    classDef validacion fill:#fca5a5,stroke:#991b1b,color:#000
+    classDef notif fill:#fde68a,stroke:#92400e,color:#000
+    classDef decision fill:#e9d5ff,stroke:#6b21a8,color:#000
+    classDef bd fill:#fef3c7,stroke:#92400e,color:#000
+
+    I((Movimiento necesario)):::inicio --> D1{Rol del usuario}:::decision
+    D1 -- Admin --> T1[Registra ENTRADA con proveedor y soporte]:::usuario
+    D1 -- Encargado --> T2[Registra SALIDA a nombre propio]:::usuario
+    T1 --> V1[RLS permite entrada solo admin]:::validacion
+    T2 --> V2[RLS fuerza registrado_por = auth.uid]:::validacion
+    V1 --> S1[Insert movimiento en transaccion]:::sistema
+    V2 --> S1
+    S1 --> DB[(movimientos_insumos + insumos)]:::bd
+    DB --> S2[Trigger recalcula stock]:::sistema
+    S2 --> D2{Stock resultante >= 0?}:::decision
+    D2 -- No --> E1((Rollback transaccion)):::fin
+    D2 -- Si --> S3[Confirma movimiento]:::sistema
+    S3 --> D3{Stock < minimo?}:::decision
+    D3 -- Si --> N1[Notifica admin categoria sistema]:::notif
+    D3 -- No --> F1((Movimiento cerrado)):::fin
+    N1 --> F2((Alerta de reposicion)):::fin

@@ -1,0 +1,20 @@
+flowchart TD
+    classDef inicio fill:#86efac,stroke:#166534,color:#000
+    classDef fin fill:#fca5a5,stroke:#991b1b,color:#000
+    classDef usuario fill:#93c5fd,stroke:#1e40af,color:#000
+    classDef manual fill:#fde68a,stroke:#92400e,color:#000
+    classDef decision fill:#e9d5ff,stroke:#6b21a8,color:#000
+
+    I((Llega pedido o se usa insumo)):::inicio --> D1{Tipo de evento}:::decision
+    D1 -- Entrada --> T1[Proveedor entrega factura]:::usuario
+    T1 --> T2[Administrador la guarda en carpeta]:::manual
+    T2 --> D2{Recuerda copiar?}:::decision
+    D2 -- Si --> T3[Copia a lista en papel]:::manual
+    D2 -- No --> F1((Stock desactualizado)):::fin
+    T3 --> F2((Entrada no verificada)):::fin
+    D1 -- Salida/consumo --> T4[Encargado usa bulto o aplica tratamiento]:::usuario
+    T4 --> T5[No registra la salida]:::manual
+    T5 --> D3{Bulto se acabo?}:::decision
+    D3 -- No --> F3((Sin trazabilidad)):::fin
+    D3 -- Si --> T6[Administrador pide mas de memoria]:::manual
+    T6 --> F4((Pedido sin base)):::fin

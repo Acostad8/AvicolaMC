@@ -8,6 +8,10 @@ import {
 import { useAuth } from '../../context/AuthContext'
 import { useNotifications } from '../../context/NotificationsContext'
 import { useConfig } from '../../context/ConfigContext'
+import { OnlineIndicator, InstallButton } from '../ui/PWABadges'
+import PendingOpsBadge from '../ui/PendingOpsBadge'
+import { countPending } from '../../lib/outbox'
+import { drainQueue } from '../../lib/outbox'
 import toast from 'react-hot-toast'
 
 /* ── Ícono por tipo de notificación ── */
@@ -182,6 +186,28 @@ export default function Header({ title, onMenuToggle }) {
 
   async function handleSignOut() {
     setUserOpen(false)
+    const pending = await countPending().catch(() => 0)
+    if (pending > 0) {
+      if (navigator.onLine) {
+        const ok = confirm(`Tienes ${pending} cambio${pending === 1 ? '' : 's'} sin sincronizar. ¿Sincronizar antes de cerrar sesión?`)
+        if (ok) {
+          toast.loading('Sincronizando...', { id: 'logout-sync' })
+          const r = await drainQueue()
+          toast.dismiss('logout-sync')
+          if (r.failed > 0) {
+            if (!confirm(`${r.failed} cambio${r.failed === 1 ? '' : 's'} no se pudo sincronizar. ¿Cerrar sesión igualmente? Se perderán localmente.`)) {
+              return
+            }
+          }
+        } else {
+          return
+        }
+      } else {
+        if (!confirm(`Sin conexión y tienes ${pending} cambio${pending === 1 ? '' : 's'} pendiente${pending === 1 ? '' : 's'}. Si cierras sesión se perderán. ¿Continuar?`)) {
+          return
+        }
+      }
+    }
     await signOut()
     toast.success('Sesión cerrada correctamente')
     navigate('/login')
@@ -209,6 +235,10 @@ export default function Header({ title, onMenuToggle }) {
       </div>
 
       <div className="flex items-center gap-1">
+
+        <InstallButton />
+        <PendingOpsBadge />
+        <OnlineIndicator />
 
         {/* ── Bell ── */}
         <div className="relative" ref={notifRef}>

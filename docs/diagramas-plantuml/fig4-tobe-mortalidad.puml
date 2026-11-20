@@ -1,0 +1,38 @@
+@startuml
+title TO-BE 2. Registro de mortalidad con actualización automática del lote (SIAMC)
+
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam ActivityBackgroundColor #EFF6FF
+skinparam ActivityBorderColor #3B82F6
+skinparam ActivityDiamondBackgroundColor #FEF3C7
+skinparam ActivityDiamondBorderColor #B45309
+skinparam ActivityStartColor #16A34A
+skinparam ActivityEndColor #DC2626
+skinparam SwimlaneBorderColor #9AA5B1
+
+|#F4F6FA|Encargado|
+start
+:Abrir módulo Mortalidad;
+:Seleccionar lote, causa y cantidad;
+|#EEF2F7|SIAMC (web + API)|
+if (¿Cantidad ≤ aves vivas del lote?) then (no)
+  #FEF2F2:Error validación;
+  stop
+else (sí)
+  #F0FDF4:Insert mortalidad en transacción;
+  #F0FDF4:Trigger SECURITY DEFINER descuenta vivas;
+  if (¿Lote queda en cero?) then (sí)
+    #F0FDF4:Proponer finalizar lote;
+  else (no)
+  endif
+  if (¿Supera umbral diario?) then (sí)
+    #FFF7ED:Emitir notificación mortalidad;
+    |#F4F6FA|Administrador|
+    :Revisa alerta en header;
+    stop
+  else (no)
+    stop
+  endif
+endif
+@enduml

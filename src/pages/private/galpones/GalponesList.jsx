@@ -8,6 +8,7 @@ import { formatNumber } from '../../../lib/utils'
 import {
   Plus, Eye, Pencil, Search, Building2, Users,
   LayoutGrid, List, X, TrendingUp, Activity, AlertTriangle, Layers, Wrench, CheckCircle2,
+  Lock,
 } from 'lucide-react'
 import Button from '../../../components/ui/Button'
 import Badge, { StatusBadge } from '../../../components/ui/Badge'
@@ -83,12 +84,63 @@ const ICON_GRADIENT = {
   en_mantenimiento: 'from-blue-400 to-blue-600',
 }
 
+/* ── Botón explícito de cambio de estado ──
+ * Texto completo visible. Muestra la ACCIÓN que ejecutará, no el estado actual.
+ */
+function EstadoActionButton({ galpon, onToggle, compact = false }) {
+  const disponible = galpon.estado === 'disponible'
+  const mantto     = galpon.estado === 'en_mantenimiento'
+  const enProd     = galpon.estado === 'en_produccion'
+
+  if (enProd) {
+    return (
+      <button
+        type="button"
+        disabled
+        title="No se puede cambiar: el galpón tiene un lote activo"
+        className={`inline-flex items-center gap-1.5 rounded-lg border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 text-xs font-semibold px-2.5 py-1.5 cursor-not-allowed opacity-80 ${compact ? '' : 'w-auto'}`}
+      >
+        <Lock className="h-3.5 w-3.5" />
+        {compact ? 'Bloqueado' : 'Bloqueado por lote activo'}
+      </button>
+    )
+  }
+
+  if (disponible) {
+    return (
+      <button
+        type="button"
+        onClick={() => onToggle(galpon)}
+        title="Marcar este galpón como en mantenimiento"
+        className={`inline-flex items-center gap-1.5 rounded-lg border border-blue-200 dark:border-blue-800/60 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 text-xs font-semibold px-2.5 py-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/40 hover:border-blue-300 dark:hover:border-blue-700 transition-colors`}
+      >
+        <Wrench className="h-3.5 w-3.5" />
+        {compact ? 'Mantenimiento' : 'Poner en mantenimiento'}
+      </button>
+    )
+  }
+
+  if (mantto) {
+    return (
+      <button
+        type="button"
+        onClick={() => onToggle(galpon)}
+        title="Marcar este galpón como disponible"
+        className={`inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 text-xs font-semibold px-2.5 py-1.5 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 hover:border-emerald-300 dark:hover:border-emerald-700 transition-colors`}
+      >
+        <CheckCircle2 className="h-3.5 w-3.5" />
+        {compact ? 'Disponible' : 'Marcar disponible'}
+      </button>
+    )
+  }
+
+  return null
+}
+
 /* ── Galpon card (grid view) ── */
 function GalponCard({ galpon, isAdmin, onToggle }) {
   const loteActivo   = galpon.lotes?.find(l => l.estado === 'activo')
   const avesActuales = loteActivo?.cantidad_aves_actuales || 0
-  const enProduccion = galpon.estado === 'en_produccion'
-  const disponible   = galpon.estado === 'disponible'
 
   const stripClass   = STRIP_CLASS[galpon.estado]   || 'bg-stone-200 dark:bg-stone-700'
   const iconGradient = ICON_GRADIENT[galpon.estado]  || 'from-stone-400 to-stone-600'
@@ -148,28 +200,22 @@ function GalponCard({ galpon, isAdmin, onToggle }) {
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 pt-3 border-t border-stone-100 dark:border-stone-800 mt-auto">
-          <Link to={`/dashboard/galpones/${galpon.id}`} className="flex-1">
-            <Button variant="secondary" size="sm" icon={Eye} className="w-full justify-center text-xs">
-              Ver detalle
-            </Button>
-          </Link>
+        <div className="flex flex-col gap-1.5 pt-3 border-t border-stone-100 dark:border-stone-800 mt-auto">
           {isAdmin && (
-            <>
-              <Link to={`/dashboard/galpones/${galpon.id}/editar`}>
-                <Button variant="secondary" size="sm" icon={Pencil} aria-label="Editar" />
-              </Link>
-              {!enProduccion && (
-                <Button
-                  variant="secondary" size="sm"
-                  onClick={() => onToggle(galpon)}
-                  icon={disponible ? Wrench : CheckCircle2}
-                  aria-label={disponible ? 'Poner en mantenimiento' : 'Marcar como disponible'}
-                  title={disponible ? 'Poner en mantenimiento' : 'Marcar como disponible'}
-                />
-              )}
-            </>
+            <EstadoActionButton galpon={galpon} onToggle={onToggle} />
           )}
+          <div className="flex items-center gap-1.5">
+            <Link to={`/dashboard/galpones/${galpon.id}`} className="flex-1">
+              <Button variant="secondary" size="sm" icon={Eye} className="w-full justify-center text-xs">
+                Ver detalle
+              </Button>
+            </Link>
+            {isAdmin && (
+              <Link to={`/dashboard/galpones/${galpon.id}/editar`}>
+                <Button variant="secondary" size="sm" icon={Pencil} aria-label="Editar" title="Editar galpón" />
+              </Link>
+            )}
+          </div>
         </div>
       </div>
     </article>
@@ -401,8 +447,6 @@ export default function GalponesList() {
                   {paginated.map(g => {
                     const loteActivo   = g.lotes?.find(l => l.estado === 'activo')
                     const avesActuales = loteActivo?.cantidad_aves_actuales || 0
-                    const enProduccion = g.estado === 'en_produccion'
-                    const disponible   = g.estado === 'disponible'
                     const iconGradient = ICON_GRADIENT[g.estado] || 'from-stone-400 to-stone-600'
                     return (
                       <tr key={g.id} className="hover:bg-stone-50 dark:hover:bg-stone-800/40 transition-colors">
@@ -429,7 +473,7 @@ export default function GalponesList() {
                           {g.encargado?.nombre_completo || <span className="text-stone-400 dark:text-stone-600 text-xs">Sin asignar</span>}
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1 flex-wrap">
                             <Link to={`/dashboard/galpones/${g.id}`}>
                               <Button variant="secondary" size="sm" icon={Eye}>Ver</Button>
                             </Link>
@@ -438,15 +482,7 @@ export default function GalponesList() {
                                 <Link to={`/dashboard/galpones/${g.id}/editar`}>
                                   <Button variant="secondary" size="sm" icon={Pencil}>Editar</Button>
                                 </Link>
-                                {!enProduccion && (
-                                  <Button
-                                    variant="secondary" size="sm"
-                                    icon={disponible ? Wrench : CheckCircle2}
-                                    onClick={() => handleToggle(g)}
-                                    aria-label={disponible ? 'Poner en mantenimiento' : 'Marcar como disponible'}
-                                    title={disponible ? 'Poner en mantenimiento' : 'Marcar como disponible'}
-                                  />
-                                )}
+                                <EstadoActionButton galpon={g} onToggle={handleToggle} compact />
                               </>
                             )}
                           </div>

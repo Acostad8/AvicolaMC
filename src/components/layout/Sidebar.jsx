@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import {
   LayoutDashboard, Building2, Layers, Egg, Skull, Syringe,
-  Package, Users, UserCog, BarChart3, Settings, LogOut, Bird, X, Truck, ShieldCheck, TrendingUp,
+  Package, Users, UserCog, BarChart3, Settings, LogOut, Bird, X, Truck, ShieldCheck, TrendingUp, Radio, Wheat, Smartphone,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { prefetchGalponesList, prefetchGalponesSelect, prefetchInsumosList, prefetchLotesList } from '../../lib/prefetch'
@@ -27,8 +27,9 @@ const adminGroups = [
   {
     label: 'Recursos',
     items: [
-      { to: '/dashboard/insumos',     icon: Package, label: 'Insumos' },
-      { to: '/dashboard/proveedores', icon: Truck,   label: 'Proveedores' },
+      { to: '/dashboard/insumos',      icon: Package, label: 'Insumos' },
+      { to: '/dashboard/alimentacion', icon: Wheat,   label: 'Alimentación' },
+      { to: '/dashboard/proveedores',  icon: Truck,   label: 'Proveedores' },
     ],
   },
   {
@@ -41,14 +42,16 @@ const adminGroups = [
   {
     label: 'Analítica',
     items: [
-      { to: '/dashboard/predicciones', icon: TrendingUp, label: 'Predicción' },
-      { to: '/dashboard/reportes',     icon: BarChart3,  label: 'Reportes' },
+      { to: '/dashboard/gemelo-digital', icon: Radio,      label: 'Gemelo Digital', badge: 'NEW' },
+      { to: '/dashboard/predicciones',   icon: TrendingUp, label: 'Predicción' },
+      { to: '/dashboard/reportes',       icon: BarChart3,  label: 'Reportes' },
     ],
   },
   {
     label: 'Sistema',
     items: [
       { to: '/dashboard/auditoria',     icon: ShieldCheck, label: 'Auditoría' },
+      { to: '/dashboard/dispositivos',  icon: Smartphone,  label: 'Dispositivos' },
       { to: '/dashboard/configuracion', icon: Settings,    label: 'Configuración' },
     ],
   },
@@ -74,14 +77,16 @@ const encargadoGroups = [
   {
     label: 'Recursos',
     items: [
-      { to: '/dashboard/insumos', icon: Package, label: 'Insumos' },
+      { to: '/dashboard/insumos',      icon: Package, label: 'Insumos' },
+      { to: '/dashboard/alimentacion', icon: Wheat,   label: 'Alimentación' },
     ],
   },
   {
     label: 'Analítica',
     items: [
-      { to: '/dashboard/predicciones', icon: TrendingUp, label: 'Predicción' },
-      { to: '/dashboard/reportes',     icon: BarChart3,  label: 'Reportes' },
+      { to: '/dashboard/gemelo-digital', icon: Radio,      label: 'Gemelo Digital', badge: 'NEW' },
+      { to: '/dashboard/predicciones',   icon: TrendingUp, label: 'Predicción' },
+      { to: '/dashboard/reportes',       icon: BarChart3,  label: 'Reportes' },
     ],
   },
 ]
@@ -111,9 +116,16 @@ const PREFETCH_ROUTES = {
     chunk: () => import('../../pages/private/insumos/InsumosList'),
     data:  () => prefetchInsumosList(),
   },
+  '/dashboard/alimentacion': {
+    chunk: () => import('../../pages/private/alimentacion/Alimentacion'),
+  },
   '/dashboard/predicciones': {
     chunk: () => import('../../pages/private/predicciones/Predicciones'),
     data:  (a, id) => prefetchGalponesSelect(a, id),
+  },
+  '/dashboard/gemelo-digital': {
+    chunk: () => import('../../pages/private/gemelo-digital/GemeloDigital'),
+    data:  (a, id) => prefetchGalponesList(a, id),
   },
   '/dashboard/proveedores': {
     chunk: () => import('../../pages/private/proveedores/ProveedoresList'),
@@ -211,7 +223,7 @@ export default function Sidebar({ open, onClose }) {
               <p className="px-3 pt-1 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-stone-400 dark:text-stone-500">
                 {group.label}
               </p>
-              {group.items.map(({ to, icon: Icon, label, exact }) => (
+              {group.items.map(({ to, icon: Icon, label, exact, badge }) => (
                 <NavLink
                   key={to}
                   to={to}
@@ -238,7 +250,12 @@ export default function Sidebar({ open, onClose }) {
                         <span aria-hidden="true" className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r bg-primary-500 dark:bg-primary-400" />
                       )}
                       <Icon className={`h-4 w-4 flex-shrink-0 ${isActive ? 'text-primary-600 dark:text-primary-400' : 'text-stone-400 dark:text-stone-500 group-hover:text-stone-600 dark:group-hover:text-stone-300'}`} aria-hidden="true" />
-                      <span className="truncate">{label}</span>
+                      <span className="truncate flex-1">{label}</span>
+                      {badge && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-gradient-to-r from-emerald-500 to-primary-500 text-white leading-none tracking-wider">
+                          {badge}
+                        </span>
+                      )}
                     </>
                   )}
                 </NavLink>

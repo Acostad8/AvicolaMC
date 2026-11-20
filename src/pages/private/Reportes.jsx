@@ -188,22 +188,30 @@ export default function Reportes() {
       const totalH   = comparativaRows.reduce((s, r) => s + r.huevos, 0)
       const avgPost  = comparativaRows.reduce((s, r) => s + r.postura_prom, 0) / comparativaRows.length
       const totalB   = comparativaRows.reduce((s, r) => s + r.bajas, 0)
+      const totalA   = comparativaRows.reduce((s, r) => s + r.alimento, 0)
+      const fcrGlob  = totalH > 0 ? (totalA / totalH).toFixed(3) : '—'
       const best     = [...comparativaRows].sort((a, b) => (b.score || 0) - (a.score || 0))[0]
       return [
         { label: 'Galpones',          value: comparativaRows.length },
         { label: 'Huevos totales',    value: totalH.toLocaleString('es-CO') },
         { label: '% Postura prom.',   value: `${avgPost.toFixed(1)}%` },
+        { label: 'Alimento total',    value: `${totalA.toFixed(1)} kg` },
+        { label: 'FCR (kg/huevo)',    value: fcrGlob },
         { label: 'Bajas totales',     value: totalB.toLocaleString('es-CO') },
         { label: 'Mejor rendimiento', value: best?.nombre || '—' },
       ]
     }
     if (!reportData?.length) return null
     if (activeReport === 'produccion') {
-      const total = reportData.reduce((s, r) => s + (r.huevos_producidos || 0), 0)
-      const avg   = reportData.reduce((s, r) => s + (r.porcentaje_postura || 0), 0) / reportData.length
+      const total  = reportData.reduce((s, r) => s + (r.huevos_producidos || 0), 0)
+      const avg    = reportData.reduce((s, r) => s + (r.porcentaje_postura || 0), 0) / reportData.length
+      const alim   = reportData.reduce((s, r) => s + Number(r.consumo_alimento_kg || 0), 0)
+      const fcr    = total > 0 && alim > 0 ? (alim / total).toFixed(3) : '—'
       return [
         { label: 'Total huevos',       value: total.toLocaleString('es-CO') },
         { label: 'Promedio % postura', value: `${avg.toFixed(1)}%` },
+        { label: 'Alimento consumido', value: `${alim.toFixed(1)} kg` },
+        { label: 'FCR (kg/huevo)',     value: fcr },
         { label: 'Registros',          value: reportData.length },
       ]
     }

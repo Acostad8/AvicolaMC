@@ -16,8 +16,8 @@ import AuditHistorial from '../../../components/ui/AuditHistorial'
 import toast from 'react-hot-toast'
 import {
   CheckCircle, PauseCircle, Layers, Bird, Building2,
-  Calendar, TrendingDown, Activity, Clock, AlertTriangle,
-  CheckCircle2, Info, Pencil, PlayCircle, Hash,
+  TrendingDown, Activity, Clock, AlertTriangle,
+  CheckCircle2, Info, Pencil, PlayCircle,
   Egg, FlaskConical, Eye,
 } from 'lucide-react'
 import {
@@ -466,6 +466,7 @@ export default function LoteDetalle() {
   const { config } = useConfig()
   const qc         = useQueryClient()
   const [confirmAction, setConfirmAction] = useState(null)
+  const [nowMs] = useState(() => Date.now())
 
   const { data: lote, isLoading } = useQuery({
     queryKey: ['lote', id],
@@ -811,7 +812,7 @@ export default function LoteDetalle() {
               {[
                 { label: 'Supervivencia', value: lote.cantidad_inicial_aves > 0 ? `${((lote.cantidad_aves_actuales / lote.cantidad_inicial_aves) * 100).toFixed(1)}%` : '—', color: lote.cantidad_aves_actuales / lote.cantidad_inicial_aves >= 0.95 ? 'text-emerald-600 dark:text-emerald-400' : lote.cantidad_aves_actuales / lote.cantidad_inicial_aves >= 0.85 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400' },
                 { label: 'Mortalidad',    value: lote.cantidad_inicial_aves > 0 ? `${((bajas / lote.cantidad_inicial_aves) * 100).toFixed(1)}%` : '—', color: 'text-red-600 dark:text-red-400' },
-                { label: 'Días en granja', value: lote.fecha_ingreso ? `${Math.floor((Date.now() - new Date(lote.fecha_ingreso).getTime()) / 86400000)} días` : '—', color: '' },
+                { label: 'Días en granja', value: lote.fecha_ingreso ? `${Math.floor((nowMs - new Date(lote.fecha_ingreso).getTime()) / 86400000)} días` : '—', color: '' },
               ].map(({ label, value, color }) => (
                 <div key={label} className="flex items-center justify-between py-2 border-b border-stone-50 dark:border-stone-800/60 last:border-0">
                   <span className="text-xs text-stone-500 dark:text-stone-400">{label}</span>

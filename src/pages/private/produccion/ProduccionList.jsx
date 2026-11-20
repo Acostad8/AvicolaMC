@@ -9,12 +9,13 @@ import { formatDate, formatNumber, downloadCSV } from '../../../lib/utils'
 import { Plus, Download, Eye, Pencil, Egg, TrendingUp, Wheat, Calendar, BarChart2, X, Filter, Lock, Clock } from 'lucide-react'
 import Button from '../../../components/ui/Button'
 import PageHeader from '../../../components/ui/PageHeader'
+import OfflineBanner from '../../../components/ui/OfflineBanner'
 import Pagination from '../../../components/ui/Pagination'
 import EmptyState from '../../../components/ui/EmptyState'
 import { TableSkeleton, Skeleton } from '../../../components/ui/Skeleton'
 import {
   AreaChart, Area, LineChart, Line,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 
 /* ── 24h edit window check ── */
@@ -293,6 +294,8 @@ export default function ProduccionList() {
           </div>
         }
       />
+
+      <OfflineBanner table="produccion" />
 
       {/* ── KPI cards ── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">

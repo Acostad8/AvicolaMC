@@ -69,4 +69,5 @@ export function NotificationsProvider({ children }) {
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useNotifications = () => useContext(NotificationsCtx)

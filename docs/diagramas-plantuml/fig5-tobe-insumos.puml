@@ -1,0 +1,35 @@
+@startuml
+title TO-BE 3. Movimientos de inventario con separación por rol (SIAMC)
+
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam ActivityBackgroundColor #EFF6FF
+skinparam ActivityBorderColor #3B82F6
+skinparam ActivityDiamondBackgroundColor #FEF3C7
+skinparam ActivityDiamondBorderColor #B45309
+skinparam ActivityStartColor #16A34A
+skinparam ActivityEndColor #DC2626
+skinparam SwimlaneBorderColor #9AA5B1
+
+|#F4F6FA|Usuario|
+start
+if (¿Rol?) then (admin)
+  :Registrar ENTRADA con proveedor y soporte;
+else (encargado)
+  :Registrar SALIDA a nombre propio;
+endif
+|#EEF2F7|SIAMC (web + API)|
+#F0FDF4:RLS valida rol y registrado_por = auth.uid();
+#F0FDF4:Insert movimiento + recalcular stock del insumo;
+if (¿Stock resultante ≥ 0?) then (no)
+  #FEF2F2:Rollback transacción;
+  stop
+else (sí)
+  #F0FDF4:Confirmar movimiento;
+  if (¿Stock < mínimo?) then (sí)
+    #FFF7ED:Notificar reposición al administrador;
+  else (no)
+  endif
+  stop
+endif
+@enduml

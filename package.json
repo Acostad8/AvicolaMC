@@ -12,9 +12,14 @@
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
     "@supabase/supabase-js": "^2.105.4",
+    "@tanstack/query-sync-storage-persister": "^5.107.1",
     "@tanstack/react-query": "^5.100.10",
+    "@tanstack/react-query-persist-client": "^5.107.1",
     "date-fns": "^4.1.0",
+    "dexie": "^4.4.7",
+    "dexie-react-hooks": "^4.4.0",
     "framer-motion": "^12.42.2",
+    "idb-keyval": "^6.3.0",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
     "lucide-react": "^1.16.0",
@@ -41,6 +46,8 @@
     "puppeteer": "^25.1.0",
     "rollup-plugin-visualizer": "^7.0.1",
     "tailwindcss": "^3.4.19",
-    "vite": "^8.0.12"
+    "vite": "^8.0.12",
+    "vite-plugin-pwa": "^2.0.0",
+    "workbox-window": "^7.4.1"
   }
 }

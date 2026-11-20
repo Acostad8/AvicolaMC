@@ -12,7 +12,7 @@ import Button from '../../../components/ui/Button'
 import PageHeader from '../../../components/ui/PageHeader'
 import toast from 'react-hot-toast'
 import {
-  User, IdCard, Briefcase, Phone, CalendarDays,
+  User, IdCard, Phone, CalendarDays,
   Activity, FileText, CheckCircle2, AlertCircle,
 } from 'lucide-react'
 
@@ -51,7 +51,7 @@ function AvatarInitials({ name }) {
   )
 }
 
-function PreviewCard({ nombre, documento, cargo, telefono, fechaIngreso, estado, notas, isEdit, telefonoDuplicado, documentoDuplicado }) {
+function PreviewCard({ nombre, documento, cargo, telefono, fechaIngreso, estado, notas, telefonoDuplicado, documentoDuplicado }) {
   const estadoColor = estado === 'activo'
     ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
     : 'bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800'
@@ -348,7 +348,6 @@ export default function EmpleadoForm() {
           fechaIngreso={fechaIngreso}
           estado={estado}
           notas={notas}
-          isEdit={isEdit}
           telefonoDuplicado={telefonoDuplicado}
           documentoDuplicado={documentoDuplicado}
         />

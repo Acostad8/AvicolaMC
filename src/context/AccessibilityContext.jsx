@@ -41,4 +41,5 @@ export function AccessibilityProvider({ children }) {
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useA11y = () => useContext(A11yCtx)

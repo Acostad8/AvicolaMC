@@ -22,11 +22,21 @@ export function AuthProvider({ children }) {
   const intervalRef      = useRef(null)
 
   async function loadPerfil(userId) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('perfiles').select('*').eq('id', userId).single()
+    if (error || !data) {
+      // Perfil no existe o error consultando — cerrar sesión para evitar estado inconsistente
+      manualSignOutRef.current = true
+      await supabase.auth.signOut()
+      toast.error('No se encontró tu perfil de usuario. Contacta al administrador.', { id: 'perfil-missing' })
+      clearAuthState()
+      return null
+    }
     setPerfil(data)
-    await supabase
+    // No bloquear el flujo si el update falla (RLS/permisos)
+    supabase
       .from('perfiles').update({ ultimo_acceso: new Date().toISOString() }).eq('id', userId)
+      .then(() => {})
     return data
   }
 
@@ -109,6 +119,7 @@ export function AuthProvider({ children }) {
       document.removeEventListener('visibilitychange', onVisibilityChange)
       clearInterval(intervalRef.current)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function signIn(email, password) {
@@ -165,6 +176,7 @@ export function AuthProvider({ children }) {
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const ctx = useContext(AuthContext)
   if (!ctx) throw new Error('useAuth must be used within AuthProvider')

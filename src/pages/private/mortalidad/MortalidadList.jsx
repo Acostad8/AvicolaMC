@@ -8,6 +8,7 @@ import { formatDate, formatNumber, downloadCSV, getLabelFromValue, CAUSAS_MORTAL
 import { Plus, Download, Eye, Pencil, Skull, TrendingDown, CalendarDays, BarChart2, X, Filter, Lock, Clock } from 'lucide-react'
 import Button from '../../../components/ui/Button'
 import PageHeader from '../../../components/ui/PageHeader'
+import OfflineBanner from '../../../components/ui/OfflineBanner'
 import Pagination from '../../../components/ui/Pagination'
 import EmptyState from '../../../components/ui/EmptyState'
 import { TableSkeleton, Skeleton } from '../../../components/ui/Skeleton'
@@ -174,6 +175,8 @@ export default function MortalidadList() {
           </div>
         }
       />
+
+      <OfflineBanner table="mortalidad" />
 
       {/* ── KPI cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

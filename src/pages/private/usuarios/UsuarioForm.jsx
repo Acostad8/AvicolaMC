@@ -13,8 +13,8 @@ import Button from '../../../components/ui/Button'
 import PageHeader from '../../../components/ui/PageHeader'
 import toast from 'react-hot-toast'
 import {
-  User, Mail, Lock, Shield, Activity, Building2,
-  UserCog, Check, CheckCircle2, AlertCircle, KeyRound,
+  User, Mail, Shield, Activity, Building2,
+  UserCog, CheckCircle2, AlertCircle, KeyRound,
 } from 'lucide-react'
 
 const createSchema = z.object({
@@ -101,7 +101,7 @@ function RadioGalpon({ items, selected, onChange, emptyText }) {
   )
 }
 
-function PreviewCard({ nombre, email, rol, estado, galponSeleccionado, galpones, empleadoNombre, emailDuplicado, isEdit }) {
+function PreviewCard({ nombre, email, rol, estado, galponSeleccionado, galpones, empleadoNombre, emailDuplicado }) {
   const rolConfig = rol === 'administrador'
     ? { label: 'Administrador', bg: 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-800', gradient: 'from-violet-400 to-violet-600' }
     : { label: 'Encargado',     bg: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800',             gradient: 'from-blue-400 to-blue-600' }
@@ -329,7 +329,7 @@ export default function UsuarioForm() {
           }
         }
       } else {
-        const { data: fnData, error: fnError } = await supabase.functions.invoke('super-api', {
+        const { data: fnData, error: fnError } = await supabase.functions.invoke('create-user', {
           body: { email: values.email, password: values.password },
         })
         if (fnError) throw fnError
@@ -529,7 +529,6 @@ export default function UsuarioForm() {
           galpones={galpones}
           empleadoNombre={empleadoNombre}
           emailDuplicado={emailDuplicado}
-          isEdit={isEdit}
         />
       </div>
     </div>

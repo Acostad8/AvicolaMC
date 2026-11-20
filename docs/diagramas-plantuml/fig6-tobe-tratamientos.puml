@@ -1,0 +1,34 @@
+@startuml
+title TO-BE 4. Aplicación y seguimiento de tratamientos sanitarios (SIAMC)
+
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam ActivityBackgroundColor #EFF6FF
+skinparam ActivityBorderColor #3B82F6
+skinparam ActivityDiamondBackgroundColor #FEF3C7
+skinparam ActivityDiamondBorderColor #B45309
+skinparam ActivityStartColor #16A34A
+skinparam ActivityEndColor #DC2626
+skinparam SwimlaneBorderColor #9AA5B1
+
+|#F4F6FA|Encargado / Admin|
+start
+:Registrar tipo, lote e insumo sanitario;
+:Definir fecha_inicio, fecha_fin, observaciones;
+|#EEF2F7|SIAMC (web + API)|
+if (¿Insumo sanitario y fecha_fin ≥ inicio?) then (no)
+  #FEF2F2:Error validación;
+  stop
+else (sí)
+  #F0FDF4:Insert tratamiento estado activo + salida de insumo;
+  note right: tratamientos +\nmovimientos_insumos
+  repeat
+    #F0FDF4:Mostrar días transcurridos y restantes;
+  repeat while (¿Fecha_fin alcanzada?) is (no)
+  |#F4F6FA|Encargado / Admin|
+  :Admin confirma cierre;
+  |#EEF2F7|SIAMC (web + API)|
+  #F0FDF4:Estado finalizado (irreversible) + auditoría;
+  stop
+endif
+@enduml

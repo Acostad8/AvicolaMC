@@ -14,16 +14,17 @@ import PageHeader from '../../../components/ui/PageHeader'
 import toast from 'react-hot-toast'
 import {
   Building2, Users, FileText, Settings2,
-  CheckCircle2, AlertCircle, AlertTriangle, Activity, Wrench, Lock,
+  CheckCircle2, AlertCircle, AlertTriangle, Activity, Wrench, Lock, Wheat,
 } from 'lucide-react'
 import { Skeleton } from '../../../components/ui/Skeleton'
 
 const schema = z.object({
-  nombre:           z.string().min(1, 'El nombre es requerido'),
-  capacidad_maxima: z.coerce.number().int().positive('Debe ser un número positivo'),
-  descripcion:      z.string().optional(),
-  estado:           z.enum(['disponible', 'en_produccion', 'en_mantenimiento']),
-  encargado_id:     z.string().optional(),
+  nombre:             z.string().min(1, 'El nombre es requerido'),
+  capacidad_maxima:   z.coerce.number().int().positive('Debe ser un número positivo'),
+  descripcion:        z.string().optional(),
+  estado:             z.enum(['disponible', 'en_produccion', 'en_mantenimiento']),
+  encargado_id:       z.string().optional(),
+  insumo_alimento_id: z.string().optional(),
 })
 
 const ESTADO_CONFIG = {
@@ -128,16 +129,17 @@ export default function GalponForm() {
   const navigate = useNavigate()
   const qc = useQueryClient()
 
-  const { register, handleSubmit, reset, watch, formState: { errors, isSubmitting } } = useForm({
+  const { register, handleSubmit, reset, watch, setValue, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
-    defaultValues: { estado: 'disponible', encargado_id: '' },
+    defaultValues: { estado: 'disponible', encargado_id: '', insumo_alimento_id: '' },
   })
 
-  const capacidad   = watch('capacidad_maxima')
-  const nombre      = watch('nombre')
-  const descripcion = watch('descripcion')
-  const estado      = watch('estado')
-  const encargadoId = watch('encargado_id')
+  const capacidad       = watch('capacidad_maxima')
+  const nombre          = watch('nombre')
+  const descripcion     = watch('descripcion')
+  const estado          = watch('estado')
+  const encargadoId     = watch('encargado_id')
+  const insumoAlimentoId = watch('insumo_alimento_id')
 
   const [nombreDebounced, setNombreDebounced] = useState('')
   useEffect(() => {
@@ -165,6 +167,43 @@ export default function GalponForm() {
       return data || []
     },
   })
+
+  const { data: alimentos, error: alimentosError } = useQuery({
+    queryKey: ['insumos-alimento'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('insumos')
+        .select('*')
+        .eq('categoria', 'alimento').eq('estado', 'activo').order('nombre')
+      if (error) throw error
+      return data || []
+    },
+  })
+
+  // Al crear nuevo galpón: sugerir alimento más usado o el único disponible
+  const { data: alimentoSugerido } = useQuery({
+    queryKey: ['alimento-mas-usado'],
+    enabled: !isEdit,
+    queryFn: async () => {
+      const { data } = await supabase.from('galpones')
+        .select('insumo_alimento_id')
+        .not('insumo_alimento_id', 'is', null)
+      if (!data?.length) return null
+      const counts = {}
+      for (const g of data) counts[g.insumo_alimento_id] = (counts[g.insumo_alimento_id] || 0) + 1
+      return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || null
+    },
+  })
+
+  // Preselección: solo al crear y si aún no tocaron el campo
+  useEffect(() => {
+    if (isEdit || !alimentos?.length || insumoAlimentoId) return
+    if (alimentos.length === 1) {
+      setValue('insumo_alimento_id', alimentos[0].id, { shouldDirty: false })
+    } else if (alimentoSugerido && alimentos.some(a => a.id === alimentoSugerido)) {
+      setValue('insumo_alimento_id', alimentoSugerido, { shouldDirty: false })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alimentos, alimentoSugerido, isEdit])
 
   const { data: galpon, isLoading: loadingGalpon } = useQuery({
     queryKey: ['galpon', id],
@@ -195,11 +234,12 @@ export default function GalponForm() {
 
   useEffect(() => {
     if (galpon) reset({
-      nombre:           galpon.nombre,
-      capacidad_maxima: galpon.capacidad_maxima,
-      descripcion:      galpon.descripcion || '',
-      estado:           galpon.estado,
-      encargado_id:     galpon.encargado_id || '',
+      nombre:             galpon.nombre,
+      capacidad_maxima:   galpon.capacidad_maxima,
+      descripcion:        galpon.descripcion || '',
+      estado:             galpon.estado,
+      encargado_id:       galpon.encargado_id || '',
+      insumo_alimento_id: galpon.insumo_alimento_id || '',
     })
   }, [galpon, reset])
 
@@ -208,7 +248,11 @@ export default function GalponForm() {
       if (tieneLoteActivo && Number(values.capacidad_maxima) < avesActivas)
         throw new Error(`La capacidad no puede ser menor a las ${avesActivas.toLocaleString('es-CO')} aves activas en el lote actual`)
 
-      const payload = { ...values, encargado_id: values.encargado_id || null }
+      const payload = {
+        ...values,
+        encargado_id:       values.encargado_id || null,
+        insumo_alimento_id: values.insumo_alimento_id || null,
+      }
       // El estado en_produccion lo gestiona el trigger; no se actualiza manualmente
       if (tieneLoteActivo) delete payload.estado
       if (isEdit) {
@@ -373,6 +417,37 @@ export default function GalponForm() {
             </FormSection>
           </div>
 
+          {/* Alimento asignado */}
+          <FormSection icon={Wheat} title="Alimento asignado" gradient="from-amber-400 to-orange-500">
+            <div className="space-y-2">
+              <Select
+                label="Insumo de alimento que consume este galpón"
+                options={[
+                  { value: '', label: 'Sin asignar — no descontará stock automáticamente' },
+                  ...(alimentos || []).map(a => ({
+                    value: a.id,
+                    label: `${a.nombre} (${a.unidad_medida}${a.kg_por_unidad ? ` · ${a.kg_por_unidad} kg/${a.unidad_medida}` : ''}) — stock: ${a.stock_actual}`,
+                  })),
+                ]}
+                error={errors.insumo_alimento_id?.message}
+                {...register('insumo_alimento_id')}
+              />
+              <p className="text-xs text-stone-500 dark:text-stone-400">
+                Al registrar producción con consumo en kg, el sistema descontará automáticamente la cantidad equivalente de este insumo del inventario.
+              </p>
+              {alimentosError && (
+                <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 rounded-xl px-3 py-2">
+                  Error al cargar insumos: {alimentosError.message}. Si el error menciona <code>kg_por_unidad</code>, ejecutá la migración <code>20261115_alimento_galpon_link.sql</code> en Supabase.
+                </p>
+              )}
+              {!alimentosError && alimentos?.length === 0 && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 rounded-xl px-3 py-2">
+                  No hay insumos de categoría "alimento" activos. Creá uno primero en Insumos.
+                </p>
+              )}
+            </div>
+          </FormSection>
+
           {/* Nota informativa cuando está en mantenimiento */}
           {!tieneLoteActivo && estado === 'en_mantenimiento' && (
             <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl">
@@ -453,6 +528,12 @@ export default function GalponForm() {
                 oldVal: galpon?.encargado_id || '',
                 newVal: pendingValues?.encargado_id || '',
                 format: v => encargados?.find(e => e.id === v)?.nombre_completo || (!v ? 'Sin asignar' : v),
+              },
+              {
+                label:  'Alimento asignado',
+                oldVal: galpon?.insumo_alimento_id || '',
+                newVal: pendingValues?.insumo_alimento_id || '',
+                format: v => alimentos?.find(a => a.id === v)?.nombre || (!v ? 'Sin asignar' : v),
               },
             ].map(({ label, oldVal, newVal, format }) => {
               const changed = String(oldVal ?? '') !== String(newVal ?? '')

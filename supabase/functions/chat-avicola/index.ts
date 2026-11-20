@@ -5,6 +5,22 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const GROQ_TIMEOUT_MS   = 45000
+const CACHE_TTL_MS      = 60_000
+const HEARTBEAT_EVERY_MS = 10_000
+
+// Cache en memoria por usuario (Edge Function warm-start la reusa)
+const farmCache = new Map<string, { data: any; expires: number }>()
+function cacheGet(key: string) {
+  const hit = farmCache.get(key)
+  if (hit && hit.expires > Date.now()) return hit.data
+  if (hit) farmCache.delete(key)
+  return null
+}
+function cacheSet(key: string, data: any) {
+  farmCache.set(key, { data, expires: Date.now() + CACHE_TTL_MS })
+}
+
 // ── Datos para encargados (solo sus galpones, últimos 14 días) ────────────
 async function fetchEncargadoData(supabase: any, galponIds: string[]) {
   const hoy = new Date().toISOString().slice(0, 10)
@@ -164,9 +180,9 @@ async function fetchAdminData(supabase: any) {
       ultimos_30_dias: { huevos: sum(prod30,  'huevos_producidos'),  alimento_kg: +sum(prod30,  'consumo_alimento_kg').toFixed(1) },
       ultimo_anio:     { huevos: sum(prodHist,'huevos_producidos'),  alimento_kg: +sum(prodHist,'consumo_alimento_kg').toFixed(1), dias_con_registro: prodHist.length },
       por_galpon_30d:  prodPorGalpon,
-      detalle_90d: prod90.slice(0, 30).map((r: any) => ({
+      ultimos_7_registros: prod90.slice(0, 7).map((r: any) => ({
         fecha: r.fecha, galpon: r.galpon?.nombre, lote: r.lote?.nombre_numero,
-        huevos: r.huevos_producidos, postura_pct: r.porcentaje_postura, alimento_kg: r.consumo_alimento_kg ?? 0,
+        huevos: r.huevos_producidos, postura_pct: r.porcentaje_postura,
       })),
     },
 
@@ -177,7 +193,7 @@ async function fetchAdminData(supabase: any) {
       ultimo_anio:     { total: sum(mortHist, 'cantidad_bajas'), registros: mortHist.length },
       causas_90d:      causas90,
       causas_anio:     causasAnio,
-      detalle_90d: mort90.map((r: any) => ({
+      ultimos_10_registros: mort90.slice(0, 10).map((r: any) => ({
         fecha: r.fecha, galpon: r.galpon?.nombre, lote: r.lote?.nombre_numero,
         bajas: r.cantidad_bajas, causa: r.causa ?? 'No especificada',
       })),
@@ -253,14 +269,24 @@ Deno.serve(async (req) => {
     let model: string
 
     if (isAdmin) {
-      farmData = await fetchAdminData(supabaseAdmin)
-      model    = 'openai/gpt-oss-120b'
+      const cacheKey = `admin:${user.id}`
+      farmData = cacheGet(cacheKey)
+      if (!farmData) {
+        farmData = await fetchAdminData(supabaseAdmin)
+        cacheSet(cacheKey, farmData)
+      }
+      model = 'llama-3.3-70b-versatile'
     } else {
-      const { data: galponesData } = await supabaseAdmin.from('galpones').select('id').eq('encargado_id', user.id)
-      const galponIds: string[] = (galponesData ?? []).map((g: any) => g.id)
-      farmData = galponIds.length > 0
-        ? await fetchEncargadoData(supabaseAdmin, galponIds)
-        : { fecha_hoy: new Date().toISOString().slice(0, 10), sin_galpones: true }
+      const cacheKey = `enc:${user.id}`
+      farmData = cacheGet(cacheKey)
+      if (!farmData) {
+        const { data: galponesData } = await supabaseAdmin.from('galpones').select('id').eq('encargado_id', user.id)
+        const galponIds: string[] = (galponesData ?? []).map((g: any) => g.id)
+        farmData = galponIds.length > 0
+          ? await fetchEncargadoData(supabaseAdmin, galponIds)
+          : { fecha_hoy: new Date().toISOString().slice(0, 10), sin_galpones: true }
+        cacheSet(cacheKey, farmData)
+      }
       model = 'llama-3.1-8b-instant'
     }
 
@@ -308,21 +334,41 @@ ${JSON.stringify(farmData)}`
       ...(messages as any[]).map((m: any) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content })),
     ]
 
-    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${GROQ_KEY}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: groqMessages,
-        temperature: 0.2,
-        max_tokens: 1024,
-      }),
-    })
+    const url = new URL(req.url)
+    const stream = url.searchParams.get('stream') === '1'
+
+    const groqCtrl = new AbortController()
+    const groqTimeout = setTimeout(() => {
+      try { groqCtrl.abort() } catch (_) { /* nop */ }
+    }, GROQ_TIMEOUT_MS)
+
+    let groqRes: Response
+    try {
+      groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        signal: groqCtrl.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${GROQ_KEY}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: groqMessages,
+          temperature: 0.2,
+          max_tokens: 1024,
+          stream,
+        }),
+      })
+    } catch (fetchErr: any) {
+      clearTimeout(groqTimeout)
+      if (fetchErr?.name === 'AbortError') {
+        throw new Error('El modelo tardó demasiado en responder. Reintenta.')
+      }
+      throw new Error(`No se pudo conectar al modelo: ${fetchErr?.message || 'error de red'}`)
+    }
 
     if (!groqRes.ok) {
+      clearTimeout(groqTimeout)
       let groqMsg = ''
       try {
         const errBody = await groqRes.json()
@@ -330,7 +376,31 @@ ${JSON.stringify(farmData)}`
       } catch (_) { /* respuesta no-JSON de Groq */ }
 
       if (groqRes.status === 429) {
-        throw new Error('El asistente alcanzó el límite de consultas por minuto. Espera unos segundos e intenta de nuevo.')
+        // Groq headers: retry-after (seconds), x-ratelimit-reset-requests, etc.
+        const retryAfterHeader = groqRes.headers.get('retry-after') ?? groqRes.headers.get('x-ratelimit-reset-requests')
+        let retryAfter = 20
+        if (retryAfterHeader) {
+          const parsed = parseFloat(retryAfterHeader)
+          if (!isNaN(parsed) && parsed > 0) retryAfter = Math.min(Math.ceil(parsed), 120)
+        } else {
+          const m = groqMsg.match(/try again in ([\d.]+)\s*(s|sec|second|m|min|minute)/i)
+          if (m) {
+            const val = parseFloat(m[1])
+            const unit = m[2].toLowerCase()
+            retryAfter = unit.startsWith('m') ? Math.ceil(val * 60) : Math.ceil(val)
+          }
+        }
+        return new Response(
+          JSON.stringify({
+            error: 'Límite de consultas alcanzado. Espera unos segundos.',
+            code: 'rate_limit',
+            retry_after: retryAfter,
+          }),
+          {
+            status: 429,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': String(retryAfter) },
+          },
+        )
       }
       if (groqRes.status === 413 || groqMsg.toLowerCase().includes('context') || groqMsg.toLowerCase().includes('token')) {
         throw new Error('La conversación es demasiado larga. Limpia el historial con el ícono de papelera e intenta de nuevo.')
@@ -338,6 +408,78 @@ ${JSON.stringify(farmData)}`
       throw new Error(groqMsg || `Error del asistente (${groqRes.status}). Intenta de nuevo en unos momentos.`)
     }
 
+    // ── Streaming SSE ──
+    if (stream && groqRes.body) {
+      clearTimeout(groqTimeout)
+      const encoder = new TextEncoder()
+      const decoder = new TextDecoder()
+      const reader  = groqRes.body.getReader()
+
+      const readable = new ReadableStream({
+        async start(controller) {
+          let buf = ''
+          let gotDelta = false
+          const heartbeat = setInterval(() => {
+            try { controller.enqueue(encoder.encode('data: {"ping":1}\n\n')) } catch (_) { /* cerrado */ }
+          }, HEARTBEAT_EVERY_MS)
+          try {
+            while (true) {
+              const { done, value } = await reader.read()
+              if (done) break
+              buf += decoder.decode(value, { stream: true })
+              const lines = buf.split('\n')
+              buf = lines.pop() ?? ''
+              for (const line of lines) {
+                const trimmed = line.trim()
+                if (!trimmed.startsWith('data:')) continue
+                const payload = trimmed.slice(5).trim()
+                if (payload === '[DONE]') {
+                  if (!gotDelta) {
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: 'El modelo no devolvió contenido. Reintenta.' })}\n\n`))
+                  }
+                  controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+                  clearInterval(heartbeat)
+                  controller.close()
+                  return
+                }
+                try {
+                  const json  = JSON.parse(payload)
+                  const delta = json?.choices?.[0]?.delta?.content ?? ''
+                  if (delta) {
+                    gotDelta = true
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta })}\n\n`))
+                  }
+                } catch {
+                  /* linea no-JSON, ignorar */
+                }
+              }
+            }
+            if (!gotDelta) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: 'El modelo no devolvió contenido. Reintenta.' })}\n\n`))
+            }
+            controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+            clearInterval(heartbeat)
+            controller.close()
+          } catch (err: any) {
+            clearInterval(heartbeat)
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: err?.message || 'stream error' })}\n\n`))
+            controller.close()
+          }
+        },
+      })
+
+      return new Response(readable, {
+        headers: {
+          ...corsHeaders,
+          'Content-Type':  'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection':    'keep-alive',
+        },
+      })
+    }
+
+    // ── Respuesta sincrónica (fallback) ──
+    clearTimeout(groqTimeout)
     const groqData = await groqRes.json()
     const text = groqData?.choices?.[0]?.message?.content?.trim() ?? 'No pude generar una respuesta.'
 

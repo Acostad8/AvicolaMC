@@ -207,7 +207,7 @@ export default function Perfil() {
               </div>
             </div>
             <div className="pb-1 min-w-0">
-              <h3 className="font-bold text-stone-900 dark:text-stone-50 text-xl leading-tight truncate">
+              <h3 className="font-bold text-white text-xl leading-tight truncate drop-shadow-[0_1px_2px_rgba(0,0,0,0.25)]">
                 {perfil?.nombre_completo || '—'}
               </h3>
               <p className="text-sm text-stone-500 dark:text-stone-400 mt-0.5 flex items-center gap-1.5 truncate">

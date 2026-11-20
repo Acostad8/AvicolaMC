@@ -1,0 +1,34 @@
+@startuml
+title AS-IS 2. Control de inventario de insumos y tratamientos (proceso actual)
+
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam ActivityBackgroundColor #FAFAFA
+skinparam ActivityBorderColor #525252
+skinparam ActivityDiamondBackgroundColor #FEF3C7
+skinparam ActivityDiamondBorderColor #B45309
+skinparam ActivityStartColor #16A34A
+skinparam ActivityEndColor #DC2626
+skinparam SwimlaneBorderColor #9AA5B1
+
+|#F4F6FA|Proveedor / Encargado|
+start
+split
+  :Entrega factura al administrador;
+  |#EEF2F7|Administrador|
+  :Guarda factura en carpeta;
+  if (¿Recuerda copiar?) then (sí)
+    :Copia a lista en papel;
+    note right: Lista aislada\nen papel
+  else (no)
+  endif
+  :Pide más al proveedor de memoria;
+  :Stock real desconocido;
+  stop
+split again
+  |Proveedor / Encargado|
+  :Usar insumo sin registrar;
+  :Sin trazabilidad sanitaria;
+  stop
+end split
+@enduml

@@ -1,0 +1,39 @@
+@startuml
+title TO-BE 5. Predicción de producción y generación de reportes PDF (SIAMC)
+
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam ActivityBackgroundColor #EFF6FF
+skinparam ActivityBorderColor #3B82F6
+skinparam ActivityDiamondBackgroundColor #FEF3C7
+skinparam ActivityDiamondBorderColor #B45309
+skinparam ActivityStartColor #16A34A
+skinparam ActivityEndColor #DC2626
+skinparam SwimlaneBorderColor #9AA5B1
+
+|#F4F6FA|Administrador|
+start
+:Abrir módulo Predicciones;
+:Elegir lote y horizonte ≤ 30 días;
+|#EEF2F7|SIAMC (web + API)|
+#F0FDF4:Consultar histórico de producción del lote;
+note right: produccion\n(histórico)
+if (¿≥ 7 registros disponibles?) then (no)
+  #FEF2F2:Datos insuficientes;
+  stop
+else (sí)
+  #F0FDF4:Aplicar regresión lineal + calcular R²;
+  |#F4F6FA|Administrador|
+  :Consultar gráfica Recharts;
+  if (¿Exportar PDF?) then (sí)
+    :Elegir filtros (rango, lote, módulo);
+    |#EEF2F7|SIAMC (web + API)|
+    #F0FDF4:jsPDF + autoTable con usuario y timestamp;
+    |#F4F6FA|Administrador|
+    :Descargar PDF;
+    stop
+  else (no)
+    stop
+  endif
+endif
+@enduml

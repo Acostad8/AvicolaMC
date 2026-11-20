@@ -10,6 +10,7 @@ import { Plus, Download, Eye, Pencil, Syringe, CheckCircle2, Activity, AlertTria
 import Button from '../../../components/ui/Button'
 import { StatusBadge } from '../../../components/ui/Badge'
 import PageHeader from '../../../components/ui/PageHeader'
+import OfflineBanner from '../../../components/ui/OfflineBanner'
 import Pagination from '../../../components/ui/Pagination'
 import EmptyState from '../../../components/ui/EmptyState'
 import { TableSkeleton, Skeleton } from '../../../components/ui/Skeleton'
@@ -171,6 +172,8 @@ export default function TratamientosList() {
           </div>
         }
       />
+
+      <OfflineBanner table="tratamientos" />
 
       {/* ── KPI cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

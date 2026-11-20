@@ -1,0 +1,34 @@
+@startuml
+title AS-IS 1. Registro manual de producción y mortalidad (proceso actual)
+
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam ActivityBackgroundColor #FAFAFA
+skinparam ActivityBorderColor #525252
+skinparam ActivityDiamondBackgroundColor #FEF3C7
+skinparam ActivityDiamondBorderColor #B45309
+skinparam ActivityStartColor #16A34A
+skinparam ActivityEndColor #DC2626
+skinparam SwimlaneBorderColor #9AA5B1
+
+|#F4F6FA|Encargado|
+start
+:Recorrer jaulas al final del día;
+:Contar huevos por bandeja;
+:Anotar cifras en cuaderno;
+:Observar aves muertas y causa;
+:Anotar mortalidad en cuaderno;
+if (¿Fin de semana?) then (no)
+  stop
+else (sí)
+  |#EEF2F7|Administrador|
+  :Transcribir cuaderno a hoja de cálculo;
+  :Calcular totales manualmente;
+  if (¿Coincide con ventas?) then (sí)
+    stop
+  else (no)
+    :Reclamar al encargado sin trazabilidad;
+    stop
+  endif
+endif
+@enduml

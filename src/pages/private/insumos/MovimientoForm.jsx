@@ -4,6 +4,9 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
+import { db } from '../../../lib/db'
+import { enqueueOp, applyLocal, uuid } from '../../../lib/outbox'
+import { useOnlineStatus } from '../../../hooks/useOnlineStatus'
 import { useAuth } from '../../../context/AuthContext'
 import {
   ArrowDownCircle, ArrowUpCircle, Info, PackageCheck,
@@ -41,7 +44,7 @@ function FormSection({ icon: Icon, title, gradient, children }) {
   )
 }
 
-function PreviewCard({ tipo, insumo, cantidad, destino, fecha, isAdmin, sinStock, stockInsuficiente }) {
+function PreviewCard({ tipo, insumo, cantidad, destino, fecha, sinStock, stockInsuficiente }) {
   const q          = Number(cantidad) || 0
   const stockActual = insumo?.stock_actual ?? 0
   const stockPost  = tipo === 'entrada' ? stockActual + q : Math.max(0, stockActual - q)
@@ -172,6 +175,7 @@ function PreviewCard({ tipo, insumo, cantidad, destino, fecha, isAdmin, sinStock
 export default function MovimientoForm() {
   const navigate            = useNavigate()
   const { perfil, isAdmin } = useAuth()
+  const online              = useOnlineStatus()
   const qc                  = useQueryClient()
   const { checkStockMinimo } = useAlertasUmbrales()
 
@@ -240,12 +244,44 @@ export default function MovimientoForm() {
       if (values.tipo === 'salida' && insumo && values.cantidad > insumo.stock_actual) {
         throw new Error(`Stock insuficiente. Disponible: ${insumo.stock_actual} ${insumo.unidad_medida}`)
       }
-      const { error } = await supabase.from('movimientos_insumos').insert({
-        ...values, registrado_por: perfil.id,
-      })
-      if (error) throw error
+
+      const client_id = uuid()
+      const nowIso = new Date().toISOString()
+      const record = {
+        id: client_id,
+        client_id,
+        fecha:             values.fecha,
+        tipo:              values.tipo,
+        insumo_id:         values.insumo_id,
+        cantidad:          Number(values.cantidad),
+        destino_proveedor: values.destino_proveedor || null,
+        observaciones:     values.observaciones || null,
+        registrado_por:    perfil.id,
+        created_at:        nowIso,
+        updated_at:        nowIso,
+      }
+
+      if (online || values.tipo === 'entrada') {
+        const { data, error } = await supabase
+          .from('movimientos_insumos')
+          .insert(record)
+          .select()
+          .maybeSingle()
+        if (error) throw error
+        if (data) await applyLocal('movimientos_insumos', data)
+        return { offline: false }
+      }
+
+      await applyLocal('movimientos_insumos', record)
+      await enqueueOp({ table: 'movimientos_insumos', op: 'insert', payload: record, client_id })
+
+      if (insumo) {
+        const nuevoStock = Math.max(0, Number(insumo.stock_actual) - record.cantidad)
+        await db.insumos.update(insumo.id, { stock_actual: nuevoStock })
+      }
+      return { offline: true }
     },
-    onSuccess: (_, values) => {
+    onSuccess: (result, values) => {
       if (values.tipo === 'salida' && insumoSeleccionado) {
         checkStockMinimo({
           insumoNombre: insumoSeleccionado.nombre,
@@ -259,7 +295,11 @@ export default function MovimientoForm() {
           qc.invalidateQueries({ queryKey: ['insumo', values.insumo_id] })
           qc.invalidateQueries({ queryKey: ['movimientos-insumo', values.insumo_id] })
           qc.invalidateQueries({ queryKey: ['dashboard-v2'] })
-          toast.success('Movimiento registrado correctamente')
+          if (result?.offline) {
+            toast.success('Guardado localmente. Se sincronizará al reconectar.')
+          } else {
+            toast.success('Movimiento registrado correctamente')
+          }
           navigate('/dashboard/insumos')
         },
         onError: e => toast.error(e.message || 'Error al guardar'),
@@ -455,7 +495,6 @@ export default function MovimientoForm() {
           cantidad={cantidad}
           destino={destino_proveedor}
           fecha={fecha}
-          isAdmin={isAdmin}
           sinStock={sinStock}
           stockInsuficiente={stockInsuficiente}
         />

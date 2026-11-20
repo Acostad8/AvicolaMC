@@ -1,0 +1,33 @@
+@startuml
+title TO-BE 1. Registro diario de producción con ventana de edición de 24 h (SIAMC)
+
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam ActivityBackgroundColor #EFF6FF
+skinparam ActivityBorderColor #3B82F6
+skinparam ActivityDiamondBackgroundColor #FEF3C7
+skinparam ActivityDiamondBorderColor #B45309
+skinparam ActivityStartColor #16A34A
+skinparam ActivityEndColor #DC2626
+skinparam SwimlaneBorderColor #9AA5B1
+
+|#F4F6FA|Encargado|
+start
+:Abrir módulo Producción;
+:Seleccionar lote activo y fecha;
+:Ingresar buenos, rotos, pequeños, deformes;
+|#EEF2F7|SIAMC (web + API)|
+#F0FDF4:Validar Zod en cliente y RLS en servidor;
+if (¿Duplicado lote+fecha?) then (sí)
+  #FEF2F2:Error constraint;
+  stop
+else (no)
+  #F0FDF4:Insert con creado_por y fecha_registro;
+  note right: produccion\n+ auditoria
+  #F0FDF4:Trigger auditoría registra diff;
+  #F0FDF4:Refresca KPIs vía TanStack Query;
+  |Encargado|
+  :Edita durante ventana ≤24h\n(solo admin después);
+  stop
+endif
+@enduml

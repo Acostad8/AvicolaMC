@@ -1,0 +1,26 @@
+flowchart TD
+    classDef inicio fill:#86efac,stroke:#166534,color:#000
+    classDef fin fill:#fca5a5,stroke:#991b1b,color:#000
+    classDef usuario fill:#93c5fd,stroke:#1e40af,color:#000
+    classDef sistema fill:#86efac,stroke:#166534,color:#000
+    classDef validacion fill:#fca5a5,stroke:#991b1b,color:#000
+    classDef decision fill:#e9d5ff,stroke:#6b21a8,color:#000
+    classDef bd fill:#fef3c7,stroke:#92400e,color:#000
+
+    I((Fin de jornada)):::inicio --> T1[Encargado abre modulo Produccion]:::usuario
+    T1 --> T2[Selecciona lote activo y fecha]:::usuario
+    T2 --> T3[Ingresa buenos, rotos, pequenos, deformes]:::usuario
+    T3 --> V1[Zod valida formulario cliente]:::validacion
+    V1 --> V2[RLS valida acceso al galpon]:::validacion
+    V2 --> D1{Duplicado lote+fecha?}:::decision
+    D1 -- Si --> E1((Error constraint)):::fin
+    D1 -- No --> S1[Insert con creado_por y fecha_registro]:::sistema
+    S1 --> DB[(Tabla produccion)]:::bd
+    DB --> S2[Trigger auditoria registra diff]:::sistema
+    S2 --> S3[TanStack Query refresca dashboard]:::sistema
+    S3 --> F1((Registro visible en KPIs)):::fin
+    S3 --> D2{Edicion dentro de 24h?}:::decision
+    D2 -- Si --> T4[Encargado o admin edita]:::usuario
+    D2 -- No --> T5[Solo admin puede editar]:::usuario
+    T4 --> S2
+    T5 --> S2

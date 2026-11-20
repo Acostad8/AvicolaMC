@@ -11,8 +11,11 @@ import { useAuth } from '../../../context/AuthContext'
 import {
   Pencil, Plus, AlertTriangle, Package, Boxes,
   ArrowDownCircle, ArrowUpCircle,
-  BarChart3, Calendar, User,
+  BarChart3, Calendar, User, Building2, Wheat, ArrowRight,
 } from 'lucide-react'
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, CartesianGrid } from 'recharts'
+import { format, subDays, parseISO } from 'date-fns'
+import { es } from 'date-fns/locale'
 
 /* ── Audit diff formatter ── */
 function formatCambiosInsumo(ant, nue) {
@@ -21,6 +24,7 @@ function formatCambiosInsumo(ant, nue) {
     categoria:     'Categoría',
     unidad_medida: 'Unidad de medida',
     stock_minimo:  'Stock mínimo',
+    kg_por_unidad: 'kg por unidad',
     estado:        'Estado',
   }
   return Object.keys(etiquetas).reduce((acc, campo) => {
@@ -138,6 +142,45 @@ export default function InsumoDetalle() {
     retry: 1,
   })
 
+  const esAlimento = insumo?.categoria === 'alimento'
+
+  const { data: galponesConsumidores } = useQuery({
+    queryKey: ['insumo-galpones', id],
+    enabled: !!id && esAlimento,
+    queryFn: async () => {
+      const { data } = await supabase.from('galpones')
+        .select('id, nombre, estado, encargado:perfiles(nombre_completo)')
+        .eq('insumo_alimento_id', id)
+        .order('nombre')
+      return data || []
+    },
+  })
+
+  const { data: consumoHist } = useQuery({
+    queryKey: ['insumo-consumo-hist', id, galponesConsumidores?.map(g => g.id).join(',')],
+    enabled: esAlimento && (galponesConsumidores?.length || 0) > 0,
+    queryFn: async () => {
+      const desde = format(subDays(new Date(), 29), 'yyyy-MM-dd')
+      const ids = galponesConsumidores.map(g => g.id)
+      const { data } = await supabase.from('produccion')
+        .select('fecha, consumo_alimento_kg')
+        .in('galpon_id', ids)
+        .gte('fecha', desde)
+      const map = {}
+      for (const p of (data || [])) {
+        map[p.fecha] = (map[p.fecha] || 0) + Number(p.consumo_alimento_kg || 0)
+      }
+      return Array.from({ length: 30 }, (_, i) => {
+        const f = format(subDays(new Date(), 29 - i), 'yyyy-MM-dd')
+        return {
+          fecha: f,
+          label: format(parseISO(f), 'd MMM', { locale: es }),
+          consumo: Math.round((map[f] || 0) * 10) / 10,
+        }
+      })
+    },
+  })
+
   if (isLoading) return <LoadingSkeleton />
   if (!insumo) return null
 
@@ -242,6 +285,83 @@ export default function InsumoDetalle() {
           bgClass="bg-red-50 dark:bg-red-900/20"
         />
       </div>
+
+      {/* ── Equivalencia kg (alimento) ── */}
+      {esAlimento && Number(insumo.kg_por_unidad) > 0 && insumo.unidad_medida !== 'kg' && (
+        <div className="card p-5 flex items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-400 to-amber-600 flex items-center justify-center flex-shrink-0">
+            <Wheat className="h-5 w-5 text-white" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-stone-800 dark:text-stone-100">
+              1 {insumo.unidad_medida} = <span className="tabular-nums">{Number(insumo.kg_por_unidad).toLocaleString('es-CO')} kg</span>
+            </p>
+            <p className="text-xs text-stone-400 dark:text-stone-500">
+              Stock equivalente: <strong>{Math.round(insumo.stock_actual * Number(insumo.kg_por_unidad)).toLocaleString('es-CO')} kg</strong>
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Galpones que consumen (solo alimento) ── */}
+      {esAlimento && (
+        <div className="card p-5 space-y-4">
+          <div className="flex items-center gap-2 pb-3 border-b border-stone-100 dark:border-stone-800">
+            <div className="w-7 h-7 bg-gradient-to-br from-amber-400 to-orange-500 rounded-lg flex items-center justify-center">
+              <Building2 className="h-3.5 w-3.5 text-white" />
+            </div>
+            <h3 className="section-title">Galpones que consumen este alimento</h3>
+          </div>
+          {(galponesConsumidores || []).length === 0 ? (
+            <div className="flex items-center justify-center py-8 text-center text-sm text-stone-400 dark:text-stone-500">
+              Ningún galpón tiene este insumo asignado todavía.
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {galponesConsumidores.map(g => (
+                  <Link key={g.id} to={`/dashboard/galpones/${g.id}`}
+                    className="flex items-center gap-3 rounded-xl border border-stone-100 dark:border-stone-800 px-4 py-3 hover:border-amber-300 dark:hover:border-amber-800 transition-colors">
+                    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center flex-shrink-0">
+                      <Building2 className="h-4 w-4 text-white" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-stone-800 dark:text-stone-100 truncate">{g.nombre}</p>
+                      <p className="text-xs text-stone-400 dark:text-stone-500 truncate">
+                        {g.estado === 'en_produccion' ? 'En producción' : g.estado.replace('_', ' ')}
+                        {g.encargado?.nombre_completo && ` · ${g.encargado.nombre_completo}`}
+                      </p>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-stone-300 dark:text-stone-600 flex-shrink-0" />
+                  </Link>
+                ))}
+              </div>
+
+              {consumoHist && consumoHist.some(d => d.consumo > 0) && (
+                <div className="pt-3 border-t border-stone-100 dark:border-stone-800">
+                  <p className="text-xs font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-2">
+                    Consumo agregado (últimos 30 días, kg)
+                  </p>
+                  <div className="h-40">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={consumoHist} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" strokeOpacity={0.4} />
+                        <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#78716c' }} interval="preserveStartEnd" />
+                        <YAxis tick={{ fontSize: 10, fill: '#78716c' }} />
+                        <RTooltip
+                          contentStyle={{ fontSize: 12, borderRadius: 12, border: '1px solid #e7e5e4' }}
+                          formatter={v => [`${v} kg`, 'Consumo']}
+                        />
+                        <Bar dataKey="consumo" fill="#f59e0b" radius={[3, 3, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {/* ── Historial de movimientos ── */}
       <div className="card overflow-hidden">

@@ -1,0 +1,25 @@
+flowchart TD
+    classDef inicio fill:#86efac,stroke:#166534,color:#000
+    classDef fin fill:#fca5a5,stroke:#991b1b,color:#000
+    classDef usuario fill:#93c5fd,stroke:#1e40af,color:#000
+    classDef sistema fill:#86efac,stroke:#166534,color:#000
+    classDef validacion fill:#fca5a5,stroke:#991b1b,color:#000
+    classDef decision fill:#e9d5ff,stroke:#6b21a8,color:#000
+    classDef bd fill:#fef3c7,stroke:#92400e,color:#000
+    classDef notif fill:#fde68a,stroke:#92400e,color:#000
+
+    I((Lote requiere tratamiento)):::inicio --> T1[Registra tipo, lote e insumo sanitario]:::usuario
+    T1 --> T2[Define fecha_inicio y fecha_fin]:::usuario
+    T2 --> V1{Insumo es sanitario y fecha_fin >= inicio?}:::decision
+    V1 -- No --> E1((Error validacion)):::fin
+    V1 -- Si --> S1[Insert tratamiento estado activo]:::sistema
+    S1 --> S2[Insert salida de insumo asociada]:::sistema
+    S2 --> DB[(tratamientos + movimientos_insumos)]:::bd
+    DB --> T3[Detalle muestra dias transcurridos y restantes]:::usuario
+    T3 --> D1{Llego fecha_fin?}:::decision
+    D1 -- No --> T3
+    D1 -- Si --> N1[Sugiere al admin cerrar]:::notif
+    N1 --> T4[Admin confirma cierre]:::usuario
+    T4 --> S3[Estado finalizado irreversible]:::sistema
+    S3 --> S4[Auditoria registra cierre con usuario]:::sistema
+    S4 --> F1((Historial sanitario disponible)):::fin

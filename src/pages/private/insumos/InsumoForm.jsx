@@ -14,17 +14,21 @@ import { ConfirmModal } from '../../../components/ui/Modal'
 import PageHeader from '../../../components/ui/PageHeader'
 import toast from 'react-hot-toast'
 import {
-  Package, Tag, Ruler, AlertCircle, CheckCircle2,
-  Activity, BarChart3, ShieldAlert,
+  Package, Tag, AlertCircle, CheckCircle2,
+  Activity, ShieldAlert, Scale,
 } from 'lucide-react'
 
 const schema = z.object({
-  nombre:        z.string().min(1, 'Requerido'),
-  categoria:     z.string().min(1, 'Requerido'),
-  unidad_medida: z.string().min(1, 'Requerido'),
-  stock_minimo:  z.coerce.number().int('Debe ser un número entero').nonnegative('Debe ser 0 o más'),
-  estado:        z.enum(['activo', 'inactivo']),
-})
+  nombre:         z.string().min(1, 'Requerido'),
+  categoria:      z.string().min(1, 'Requerido'),
+  unidad_medida:  z.string().min(1, 'Requerido'),
+  stock_minimo:   z.coerce.number().int('Debe ser un número entero').nonnegative('Debe ser 0 o más'),
+  kg_por_unidad:  z.union([z.coerce.number().positive('Debe ser mayor a 0'), z.literal(''), z.null()]).optional(),
+  estado:         z.enum(['activo', 'inactivo']),
+}).refine(
+  v => !(v.categoria === 'alimento' && v.unidad_medida && v.unidad_medida !== 'kg' && (v.kg_por_unidad === '' || v.kg_por_unidad == null)),
+  { message: 'Requerido para alimentos con unidad distinta a kg', path: ['kg_por_unidad'] }
+)
 
 const CATEGORIA_COLORS = {
   alimento:      'from-amber-400 to-amber-600',
@@ -49,7 +53,7 @@ function FormSection({ icon: Icon, title, gradient, children }) {
   )
 }
 
-function PreviewCard({ nombre, categoria, unidadMedida, stockMinimo, estado, isEdit }) {
+function PreviewCard({ nombre, categoria, unidadMedida, stockMinimo, kgPorUnidad, estado, isEdit }) {
   const categoriaLabel = CATEGORIAS_INSUMO.find(c => c.value === categoria)?.label || categoria
   const unidadLabel    = UNIDADES_MEDIDA.find(u => u.value === unidadMedida)?.label || unidadMedida
   const gradient       = CATEGORIA_COLORS[categoria] || 'from-stone-400 to-stone-600'
@@ -116,6 +120,15 @@ function PreviewCard({ nombre, categoria, unidadMedida, stockMinimo, estado, isE
             </div>
           </div>
 
+          {categoria === 'alimento' && unidadMedida && unidadMedida !== 'kg' && Number(kgPorUnidad) > 0 && (
+            <div className="bg-white/60 dark:bg-stone-800/60 rounded-lg px-3 py-2">
+              <p className="text-xs text-stone-400 dark:text-stone-500">Equivalencia</p>
+              <p className="text-sm font-bold text-stone-700 dark:text-stone-200 mt-0.5 tabular-nums">
+                1 {unidadMedida} = {Number(kgPorUnidad).toLocaleString('es-CO')} kg
+              </p>
+            </div>
+          )}
+
           {!isEdit && (
             <div className="bg-white/60 dark:bg-stone-800/60 rounded-lg px-3 py-2">
               <p className="text-xs text-stone-400 dark:text-stone-500">Stock inicial</p>
@@ -170,7 +183,10 @@ export default function InsumoForm() {
   const categoria    = watch('categoria')
   const unidadMedida = watch('unidad_medida')
   const stockMinimo  = watch('stock_minimo')
+  const kgPorUnidad  = watch('kg_por_unidad')
   const estado       = watch('estado')
+
+  const mostrarKgPorUnidad = categoria === 'alimento' && unidadMedida && unidadMedida !== 'kg'
 
   const { data: insumo } = useQuery({
     queryKey: ['insumo', id],
@@ -185,31 +201,36 @@ export default function InsumoForm() {
     if (insumo) reset({
       nombre: insumo.nombre, categoria: insumo.categoria,
       unidad_medida: insumo.unidad_medida, stock_minimo: insumo.stock_minimo,
+      kg_por_unidad: insumo.kg_por_unidad ?? '',
       estado: insumo.estado,
     })
   }, [insumo, reset])
 
   const mutation = useMutation({
     mutationFn: async (values) => {
+      const kg_por_unidad = values.categoria === 'alimento' && values.unidad_medida !== 'kg' && values.kg_por_unidad
+        ? Number(values.kg_por_unidad)
+        : null
+      const payload = {
+        nombre: values.nombre, categoria: values.categoria,
+        unidad_medida: values.unidad_medida, stock_minimo: values.stock_minimo,
+        kg_por_unidad, estado: values.estado,
+      }
       if (isEdit) {
         const datosAnteriores = {
           nombre: insumo.nombre, categoria: insumo.categoria,
           unidad_medida: insumo.unidad_medida, stock_minimo: insumo.stock_minimo,
-          estado: insumo.estado,
+          kg_por_unidad: insumo.kg_por_unidad, estado: insumo.estado,
         }
-        const datosNuevos = {
-          nombre: values.nombre, categoria: values.categoria,
-          unidad_medida: values.unidad_medida, stock_minimo: values.stock_minimo,
-          estado: values.estado,
-        }
-        const { error } = await supabase.from('insumos').update(values).eq('id', id)
+        const datosNuevos = { ...payload }
+        const { error } = await supabase.from('insumos').update(payload).eq('id', id)
         if (error) throw error
         await supabase.from('auditoria_insumos').insert({
           insumo_id: id, editado_por: perfil.id,
           datos_anteriores: datosAnteriores, datos_nuevos: datosNuevos,
         })
       } else {
-        const { error } = await supabase.from('insumos').insert({ ...values, stock_actual: 0 })
+        const { error } = await supabase.from('insumos').insert({ ...payload, stock_actual: 0 })
         if (error) throw error
       }
     },
@@ -282,6 +303,26 @@ export default function InsumoForm() {
             </div>
           </FormSection>
 
+          {/* ── Conversión kg (solo alimento con unidad distinta de kg) ── */}
+          {mostrarKgPorUnidad && (
+            <FormSection icon={Scale} title="Equivalencia en kg" gradient="from-orange-400 to-amber-600">
+              <div className="space-y-2">
+                <Input
+                  label={`¿Cuántos kg contiene 1 ${unidadMedida}?`}
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  placeholder="Ej: 40"
+                  error={errors.kg_por_unidad?.message}
+                  {...register('kg_por_unidad')}
+                />
+                <p className="text-xs text-stone-500 dark:text-stone-400">
+                  Usado para convertir los <strong>kg de consumo</strong> registrados en producción a <strong>{unidadMedida}s</strong> descontados del stock. Si lo dejás vacío, se asume 1 kg por {unidadMedida}.
+                </p>
+              </div>
+            </FormSection>
+          )}
+
           {/* ── Stock y estado ── */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-7">
             <FormSection icon={ShieldAlert} title="Alerta de stock" gradient="from-amber-400 to-orange-500">
@@ -329,6 +370,7 @@ export default function InsumoForm() {
           categoria={categoria}
           unidadMedida={unidadMedida}
           stockMinimo={stockMinimo}
+          kgPorUnidad={kgPorUnidad}
           estado={estado}
           isEdit={isEdit}
         />

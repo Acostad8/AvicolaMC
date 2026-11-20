@@ -5,11 +5,14 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
+import { db } from '../../../lib/db'
+import { enqueueOp, applyLocal, uuid } from '../../../lib/outbox'
+import { useOnlineStatus } from '../../../hooks/useOnlineStatus'
 import { useAuth } from '../../../context/AuthContext'
 import { TIPOS_TRATAMIENTO } from '../../../lib/utils'
 import {
-  FlaskConical, Info, Building2, Layers, CheckCircle2,
-  AlertCircle, AlertTriangle, Package, User, CalendarDays, Activity, Clock,
+  FlaskConical, Info, Layers, CheckCircle2,
+  AlertCircle, AlertTriangle, User, CalendarDays, Activity, Clock,
 } from 'lucide-react'
 import Input from '../../../components/ui/Input'
 import Select from '../../../components/ui/Select'
@@ -202,6 +205,7 @@ export default function TratamientoForm() {
   const { id }              = useParams()
   const isEdit              = !!id
   const navigate            = useNavigate()
+  const online              = useOnlineStatus()
   const qc                  = useQueryClient()
   const { perfil, isAdmin } = useAuth()
 
@@ -363,7 +367,7 @@ export default function TratamientoForm() {
   const stockDisponibleEdicion  = isEdit ? (insumoTratamiento?.stock_actual ?? 0) + (tratamiento?.cantidad_usada ?? 0) : 0
   const stockInsuficienteEdicion = isEdit && !!insumoTratamiento && Number(cantidadUsada) > stockDisponibleEdicion
 
-  const sugeridas = CATEGORIAS_SUGERIDAS[tipoTrat] || []
+  const sugeridas = useMemo(() => CATEGORIAS_SUGERIDAS[tipoTrat] || [], [tipoTrat])
   const opcionesInsumos = useMemo(() => {
     return insumosFiltrados.map(i => {
       const esSugerido = sugeridas.includes(i.categoria)
@@ -451,30 +455,69 @@ export default function TratamientoForm() {
         if (Number(values.cantidad_usada) > insumo.stock_actual) {
           throw new Error(`Stock insuficiente. Disponible: ${insumo.stock_actual} ${insumo.unidad_medida}`)
         }
-        const { error: errTrat } = await supabase.from('tratamientos').insert({
-          fecha_inicio: values.fecha_inicio, fecha_fin: values.fecha_fin || null,
-          galpon_id: values.galpon_id, lote_id: loteActivo.id, tipo: values.tipo,
-          nombre_producto: insumo.nombre, insumo_id: values.insumo_id,
-          cantidad_usada: values.cantidad_usada, dosis_aplicacion: values.dosis_aplicacion,
-          empleado_id: isAdmin ? (values.empleado_id || null) : null,
-          responsable: nombreEmpleado,
-          estado: values.estado,
-          observaciones: values.observaciones || null,
-        })
-        if (errTrat) throw errTrat
 
         const tipoLbl = TIPOS_TRATAMIENTO.find(t => t.value === values.tipo)?.label || values.tipo
-        const { error: errMov } = await supabase.from('movimientos_insumos').insert({
-          fecha: values.fecha_inicio, tipo: 'salida', insumo_id: values.insumo_id,
-          cantidad: values.cantidad_usada,
+        const nowIso = new Date().toISOString()
+        const tratClientId = uuid()
+        const movClientId  = uuid()
+
+        const tratRecord = {
+          id: tratClientId,
+          client_id: tratClientId,
+          fecha_inicio:     values.fecha_inicio,
+          fecha_fin:        values.fecha_fin || null,
+          galpon_id:        values.galpon_id,
+          lote_id:          loteActivo.id,
+          tipo:             values.tipo,
+          nombre_producto:  insumo.nombre,
+          insumo_id:        values.insumo_id,
+          cantidad_usada:   Number(values.cantidad_usada),
+          dosis_aplicacion: values.dosis_aplicacion,
+          empleado_id:      isAdmin ? (values.empleado_id || null) : null,
+          responsable:      nombreEmpleado,
+          estado:           values.estado,
+          observaciones:    values.observaciones || null,
+          created_at:       nowIso,
+          updated_at:       nowIso,
+        }
+
+        const movRecord = {
+          id: movClientId,
+          client_id: movClientId,
+          fecha:             values.fecha_inicio,
+          tipo:              'salida',
+          insumo_id:         values.insumo_id,
+          cantidad:          Number(values.cantidad_usada),
           destino_proveedor: `Tratamiento: ${tipoLbl} — Lote ${loteActivo.nombre_numero}`,
-          observaciones: 'Registrado automáticamente desde módulo de tratamientos',
-          registrado_por: perfil?.id,
-        })
-        if (errMov) throw errMov
+          observaciones:     'Registrado automáticamente desde módulo de tratamientos',
+          registrado_por:    perfil?.id,
+          created_at:        nowIso,
+          updated_at:        nowIso,
+        }
+
+        if (online) {
+          const { data: tratData, error: errTrat } = await supabase
+            .from('tratamientos').insert(tratRecord).select().maybeSingle()
+          if (errTrat) throw errTrat
+          if (tratData) await applyLocal('tratamientos', tratData)
+
+          const { data: movData, error: errMov } = await supabase
+            .from('movimientos_insumos').insert(movRecord).select().maybeSingle()
+          if (errMov) throw errMov
+          if (movData) await applyLocal('movimientos_insumos', movData)
+        } else {
+          await applyLocal('tratamientos', tratRecord)
+          await applyLocal('movimientos_insumos', movRecord)
+          await enqueueOp({ table: 'tratamientos', op: 'insert', payload: tratRecord, client_id: tratClientId })
+          await enqueueOp({ table: 'movimientos_insumos', op: 'insert', payload: movRecord, client_id: movClientId })
+
+          const nuevoStock = Math.max(0, Number(insumo.stock_actual) - movRecord.cantidad)
+          await db.insumos.update(insumo.id, { stock_actual: nuevoStock })
+          return { offline: true }
+        }
       }
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: ['tratamientos'] })
       qc.invalidateQueries({ queryKey: ['tratamiento', id] })
       qc.invalidateQueries({ queryKey: ['auditoria-tratamiento', id] })
@@ -485,7 +528,11 @@ export default function TratamientoForm() {
         qc.invalidateQueries({ queryKey: ['movimientos-insumo', tratamiento.insumo_id] })
       }
       qc.invalidateQueries({ queryKey: ['dashboard-v2'] })
-      toast.success(isEdit ? 'Tratamiento actualizado' : 'Tratamiento registrado')
+      if (result?.offline) {
+        toast.success('Guardado localmente. Se sincronizará al reconectar.')
+      } else {
+        toast.success(isEdit ? 'Tratamiento actualizado' : 'Tratamiento registrado')
+      }
       navigate(isEdit ? `/dashboard/tratamientos/${id}` : '/dashboard/tratamientos')
     },
     onError: e => toast.error(e.message || 'Error al guardar'),

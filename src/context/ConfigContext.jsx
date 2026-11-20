@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 const STORAGE_KEY = 'avicola-mc-config'
 const CONFIG_ID = 1
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const CONFIG_DEFAULTS = {
   granja: {
     nombre:    '',
@@ -20,7 +21,6 @@ export const CONFIG_DEFAULTS = {
     alerta_mortalidad:        5,
     umbral_dias_tratamiento:  7,
     peso_promedio_huevo_g:   60,
-    peso_saco_kg:            40,
   },
   notificaciones: {
     habilitadas:   true,
@@ -97,4 +97,5 @@ export function ConfigProvider({ children }) {
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useConfig = () => useContext(ConfigCtx)

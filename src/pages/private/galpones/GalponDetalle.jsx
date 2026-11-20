@@ -9,7 +9,7 @@ import PageHeader from '../../../components/ui/PageHeader'
 import Button from '../../../components/ui/Button'
 import Badge, { StatusBadge } from '../../../components/ui/Badge'
 import AuditHistorial from '../../../components/ui/AuditHistorial'
-import { Pencil, Plus, Egg, Building2, Users, Layers, Calendar, Activity } from 'lucide-react'
+import { Pencil, Plus, Egg, Building2, Users, Layers, Calendar, Activity, Wheat, Package, AlertTriangle, ArrowRight, Clock } from 'lucide-react'
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { format, subDays } from 'date-fns'
 import { Skeleton } from '../../../components/ui/Skeleton'
@@ -121,9 +121,25 @@ export default function GalponDetalle() {
     queryFn: async () => {
       const { data } = await supabase.from('galpones').select(`
         *, encargado:perfiles(nombre_completo),
-        lotes(*, raza:razas(nombre))
+        lotes(*, raza:razas(nombre)),
+        alimento:insumos!galpones_insumo_alimento_id_fkey(
+          id, nombre, unidad_medida, kg_por_unidad, stock_actual, stock_minimo, estado
+        )
       `).eq('id', id).single()
       return data
+    },
+  })
+
+  const { data: consumoAlimento } = useQuery({
+    queryKey: ['galpon-consumo-alimento', id],
+    enabled: !!id,
+    queryFn: async () => {
+      const desde = format(subDays(new Date(), 6), 'yyyy-MM-dd')
+      const { data } = await supabase.from('produccion')
+        .select('consumo_alimento_kg')
+        .eq('galpon_id', id)
+        .gte('fecha', desde)
+      return (data || []).reduce((s, p) => s + Number(p.consumo_alimento_kg || 0), 0)
     },
   })
 
@@ -314,6 +330,112 @@ export default function GalponDetalle() {
               </div>
               <p className="text-stone-500 dark:text-stone-400 text-sm font-medium">No hay lote activo</p>
               <p className="text-stone-400 dark:text-stone-500 text-xs mt-1">Crea un nuevo lote para comenzar a registrar producción</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Alimento asignado ── */}
+      <div className="card p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 bg-gradient-to-br from-amber-400 to-orange-500 rounded-lg flex items-center justify-center">
+              <Wheat className="h-3.5 w-3.5 text-white" aria-hidden="true" />
+            </div>
+            <h2 className="section-title">Alimento asignado</h2>
+          </div>
+          {isAdmin && (
+            <Link to={`/dashboard/galpones/${id}/editar`}>
+              <Button size="sm" variant="secondary" icon={Pencil}>
+                {galpon.alimento ? 'Cambiar' : 'Asignar'}
+              </Button>
+            </Link>
+          )}
+        </div>
+
+        {galpon.alimento ? (() => {
+          const kgPorU = Number(galpon.alimento.kg_por_unidad) || 1
+          const stockKg = Number(galpon.alimento.stock_actual) * kgPorU
+          const promDiario = (consumoAlimento || 0) / 7
+          const diasProy = promDiario > 0 ? Math.floor(stockKg / promDiario) : null
+          const bajoMinimo = galpon.alimento.stock_minimo > 0 && Number(galpon.alimento.stock_actual) < Number(galpon.alimento.stock_minimo)
+          return (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Link
+                  to={`/dashboard/insumos/${galpon.alimento.id}`}
+                  className="flex items-center gap-3 flex-1 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center shadow-sm">
+                    <Package className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-stone-800 dark:text-stone-100">{galpon.alimento.nombre}</p>
+                    <p className="text-xs text-stone-400 dark:text-stone-500 capitalize">
+                      {galpon.alimento.unidad_medida}
+                      {kgPorU > 1 && ` · ${kgPorU} kg/${galpon.alimento.unidad_medida}`}
+                    </p>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-stone-300 dark:text-stone-600 ml-auto" />
+                </Link>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className={`rounded-xl border p-3 ${bajoMinimo ? 'border-red-200 dark:border-red-800 bg-red-50/60 dark:bg-red-950/20' : 'border-stone-100 dark:border-stone-800 bg-stone-50/60 dark:bg-stone-800/30'}`}>
+                  <p className="text-[10px] text-stone-400 dark:text-stone-500 uppercase tracking-wide">Stock actual</p>
+                  <p className={`text-base font-bold tabular-nums mt-0.5 ${bajoMinimo ? 'text-red-600 dark:text-red-400' : 'text-stone-800 dark:text-stone-100'}`}>
+                    {Number(galpon.alimento.stock_actual).toLocaleString('es-CO')} {galpon.alimento.unidad_medida}
+                  </p>
+                  {kgPorU > 1 && <p className="text-[10px] text-stone-400 mt-0.5 tabular-nums">≈ {Math.round(stockKg).toLocaleString('es-CO')} kg</p>}
+                </div>
+                <div className="rounded-xl border border-stone-100 dark:border-stone-800 bg-stone-50/60 dark:bg-stone-800/30 p-3">
+                  <p className="text-[10px] text-stone-400 dark:text-stone-500 uppercase tracking-wide">Stock mínimo</p>
+                  <p className="text-base font-bold text-stone-700 dark:text-stone-200 tabular-nums mt-0.5">
+                    {galpon.alimento.stock_minimo > 0 ? `${galpon.alimento.stock_minimo} ${galpon.alimento.unidad_medida}` : '—'}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-stone-100 dark:border-stone-800 bg-stone-50/60 dark:bg-stone-800/30 p-3">
+                  <p className="text-[10px] text-stone-400 dark:text-stone-500 uppercase tracking-wide">Consumo 7d</p>
+                  <p className="text-base font-bold text-stone-700 dark:text-stone-200 tabular-nums mt-0.5">
+                    {(consumoAlimento || 0).toLocaleString('es-CO')} kg
+                  </p>
+                  {promDiario > 0 && <p className="text-[10px] text-stone-400 mt-0.5 tabular-nums">~{Math.round(promDiario)} kg/día</p>}
+                </div>
+                <div className={`rounded-xl border p-3 ${
+                  diasProy == null ? 'border-stone-100 dark:border-stone-800 bg-stone-50/60 dark:bg-stone-800/30' :
+                  diasProy < 3 ? 'border-red-200 dark:border-red-800 bg-red-50/60 dark:bg-red-950/20' :
+                  diasProy < 7 ? 'border-amber-200 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-950/20' :
+                  'border-emerald-200 dark:border-emerald-800 bg-emerald-50/60 dark:bg-emerald-950/20'
+                }`}>
+                  <p className="text-[10px] text-stone-400 dark:text-stone-500 uppercase tracking-wide">Autonomía</p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <Clock className={`h-3.5 w-3.5 ${
+                      diasProy == null ? 'text-stone-400' :
+                      diasProy < 3 ? 'text-red-500' : diasProy < 7 ? 'text-amber-500' : 'text-emerald-500'
+                    }`} />
+                    <p className="text-base font-bold tabular-nums text-stone-800 dark:text-stone-100">
+                      {diasProy != null ? `${diasProy} días` : '—'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {bajoMinimo && (
+                <div className="flex items-center gap-2 rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 px-4 py-2.5 text-sm text-red-700 dark:text-red-400">
+                  <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                  Stock por debajo del mínimo configurado. Registrá una entrada de inventario cuanto antes.
+                </div>
+              )}
+            </div>
+          )
+        })() : (
+          <div className="flex items-center justify-center py-8 text-center">
+            <div>
+              <div className="w-12 h-12 bg-stone-100 dark:bg-stone-800 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                <Wheat className="h-6 w-6 text-stone-400 dark:text-stone-500" aria-hidden="true" />
+              </div>
+              <p className="text-stone-500 dark:text-stone-400 text-sm font-medium">Sin alimento asignado</p>
+              <p className="text-stone-400 dark:text-stone-500 text-xs mt-1">El consumo registrado no descontará stock hasta asignar un insumo</p>
             </div>
           </div>
         )}

@@ -37,7 +37,7 @@ export function usePrediccionData({ galponIds, diasFuturos = 14 }) {
           .in('galpon_id', galponIds)
           .eq('estado', 'activo'),
         supabase.from('insumos')
-          .select('nombre, stock_actual, unidad_medida')
+          .select('nombre, stock_actual, unidad_medida, kg_por_unidad')
           .eq('categoria', 'alimento')
           .eq('estado', 'activo'),
       ])

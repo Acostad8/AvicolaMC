@@ -16,7 +16,7 @@ import { Skeleton } from '../../../components/ui/Skeleton'
 import toast from 'react-hot-toast'
 import {
   Layers, Building2, Bird, AlertCircle, CheckCircle2,
-  Info, Lock, CalendarDays, Hash, FileText, Shuffle,
+  Info, Lock, Hash, FileText, Shuffle,
 } from 'lucide-react'
 import { formatDate, formatNumber } from '../../../lib/utils'
 

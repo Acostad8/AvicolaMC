@@ -14,7 +14,7 @@ import Modal from '../../../components/ui/Modal'
 import PageHeader from '../../../components/ui/PageHeader'
 import toast from 'react-hot-toast'
 import {
-  Truck, User, Phone, Mail, MapPin, Tag,
+  Truck, Phone, Mail, MapPin, Tag,
   Package, Bird, FileText, Activity,
   CheckCircle2, AlertCircle, Check,
 } from 'lucide-react'
@@ -125,7 +125,7 @@ function GroupedCheckList({ items, selected, onToggle, emptyText }) {
   )
 }
 
-function PreviewCard({ nombre, tipoLabel, telefono, correo, direccion, estado, selectedInsumos, selectedRazas, insumos, razas, isEdit }) {
+function PreviewCard({ nombre, tipoLabel, telefono, correo, direccion, estado, selectedInsumos, selectedRazas, insumos, razas }) {
   const estadoColor = estado === 'activo'
     ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
     : 'bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800'
@@ -256,7 +256,6 @@ export default function ProveedorForm() {
   const correo        = watch('correo')
   const direccion     = watch('direccion')
   const estado        = watch('estado')
-  const notas         = watch('notas')
 
   const tipoLabel = TIPOS_PROVEEDOR.find(t => t.value === tipoProveedor)?.label
 
@@ -516,7 +515,6 @@ export default function ProveedorForm() {
           selectedRazas={selectedRazas}
           insumos={insumos}
           razas={razas}
-          isEdit={isEdit}
         />
       </div>
 

@@ -1,0 +1,26 @@
+flowchart TD
+    classDef inicio fill:#86efac,stroke:#166534,color:#000
+    classDef fin fill:#fca5a5,stroke:#991b1b,color:#000
+    classDef usuario fill:#93c5fd,stroke:#1e40af,color:#000
+    classDef sistema fill:#86efac,stroke:#166534,color:#000
+    classDef validacion fill:#fca5a5,stroke:#991b1b,color:#000
+    classDef notif fill:#fde68a,stroke:#92400e,color:#000
+    classDef decision fill:#e9d5ff,stroke:#6b21a8,color:#000
+    classDef bd fill:#fef3c7,stroke:#92400e,color:#000
+
+    I((Encargado detecta aves muertas)):::inicio --> T1[Abre modulo Mortalidad]:::usuario
+    T1 --> T2[Selecciona lote y causa cerrada]:::usuario
+    T2 --> T3[Ingresa cantidad]:::usuario
+    T3 --> V1{Cantidad <= aves vivas?}:::decision
+    V1 -- No --> E1((Error validacion)):::fin
+    V1 -- Si --> S1[Insert mortalidad en transaccion]:::sistema
+    S1 --> DB[(mortalidad + lotes)]:::bd
+    DB --> S2[Trigger SECURITY DEFINER descuenta lote]:::sistema
+    S2 --> D1{Lote queda en cero?}:::decision
+    D1 -- Si --> S3[Propone finalizar lote]:::sistema
+    D1 -- No --> S4[Lote sigue activo]:::sistema
+    S3 --> N1[Notifica categoria mortalidad]:::notif
+    S4 --> D2{Supera umbral diario?}:::decision
+    D2 -- Si --> N1
+    D2 -- No --> F1((Registro cerrado)):::fin
+    N1 --> F2((Alerta visible en header)):::fin

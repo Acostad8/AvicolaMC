@@ -66,12 +66,22 @@ export function useIdleTimeout({
       if (!warningActive.current) resetTimer()
     }
     ACTIVITY_EVENTS.forEach(ev => window.addEventListener(ev, onActivity, { passive: true }))
-    resetTimer()
+
+    warnTimerRef.current = setTimeout(() => {
+      warningActive.current = true
+      setIsWarning(true)
+      startCountdown()
+    }, timeoutMs - warningMs)
+    outTimerRef.current = setTimeout(() => {
+      clearInterval(countTimerRef.current)
+      onTimeoutRef.current()
+    }, timeoutMs)
+
     return () => {
       clearAll()
       ACTIVITY_EVENTS.forEach(ev => window.removeEventListener(ev, onActivity))
     }
-  }, [resetTimer, clearAll])
+  }, [resetTimer, clearAll, startCountdown, timeoutMs, warningMs])
 
   return { isWarning, countdown, warningSeconds, resetTimer }
 }

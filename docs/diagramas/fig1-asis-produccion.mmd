@@ -1,0 +1,20 @@
+flowchart TD
+    classDef inicio fill:#86efac,stroke:#166534,color:#000
+    classDef fin fill:#fca5a5,stroke:#991b1b,color:#000
+    classDef usuario fill:#93c5fd,stroke:#1e40af,color:#000
+    classDef manual fill:#fde68a,stroke:#92400e,color:#000
+    classDef decision fill:#e9d5ff,stroke:#6b21a8,color:#000
+
+    I((Fin del dia)):::inicio --> T1[Encargado recorre jaulas]:::usuario
+    T1 --> T2[Cuenta huevos por bandeja]:::manual
+    T2 --> T3[Anota cifras en cuaderno]:::manual
+    T3 --> T4[Observa aves muertas y causa]:::usuario
+    T4 --> T5[Anota mortalidad en cuaderno]:::manual
+    T5 --> D1{Fin de semana?}:::decision
+    D1 -- No --> F1((Dia cerrado)):::fin
+    D1 -- Si --> T6[Administrador transcribe a Excel]:::manual
+    T6 --> T7[Calcula totales manualmente]:::manual
+    T7 --> D2{Cifra coincide con ventas?}:::decision
+    D2 -- Si --> F2((Semana cerrada)):::fin
+    D2 -- No --> T8[Reclama al encargado sin trazabilidad]:::manual
+    T8 --> F3((Sin evidencia)):::fin

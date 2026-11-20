@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Accessibility, X, Sun, Moon, Eye, EyeOff } from 'lucide-react'
+import { Accessibility, X, Sun, Moon, Eye } from 'lucide-react'
 import { useA11y } from '../../context/AccessibilityContext'
 
 const TEXT_SIZES = [

@@ -1,0 +1,25 @@
+flowchart TD
+    classDef inicio fill:#86efac,stroke:#166534,color:#000
+    classDef fin fill:#fca5a5,stroke:#991b1b,color:#000
+    classDef usuario fill:#93c5fd,stroke:#1e40af,color:#000
+    classDef sistema fill:#86efac,stroke:#166534,color:#000
+    classDef validacion fill:#fca5a5,stroke:#991b1b,color:#000
+    classDef decision fill:#e9d5ff,stroke:#6b21a8,color:#000
+    classDef bd fill:#fef3c7,stroke:#92400e,color:#000
+    classDef archivo fill:#fde68a,stroke:#92400e,color:#000
+
+    I((Admin necesita proyeccion)):::inicio --> T1[Abre modulo Predicciones]:::usuario
+    T1 --> T2[Selecciona lote y horizonte <= 30 dias]:::usuario
+    T2 --> S1[Consulta historico produccion]:::sistema
+    S1 --> DB[(produccion)]:::bd
+    DB --> V1{>= 7 registros disponibles?}:::decision
+    V1 -- No --> E1((Datos insuficientes)):::fin
+    V1 -- Si --> S2[Aplica regresion lineal lib/estadistica.js]:::sistema
+    S2 --> S3[Calcula R2 y proyeccion]:::sistema
+    S3 --> T3[Muestra grafica Recharts con intervalo]:::usuario
+    T3 --> D1{Admin exporta PDF?}:::decision
+    D1 -- No --> F1((Consulta cerrada)):::fin
+    D1 -- Si --> T4[Elige filtros rango, lote, modulo]:::usuario
+    T4 --> S4[jsPDF + autoTable genera PDF]:::sistema
+    S4 --> A1[PDF con usuario y timestamp]:::archivo
+    A1 --> F2((PDF descargado)):::fin

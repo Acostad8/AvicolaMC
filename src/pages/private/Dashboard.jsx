@@ -5,13 +5,14 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import { useA11y } from '../../context/AccessibilityContext'
 import { useConfig } from '../../context/ConfigContext'
+import MultiDeviceBanner from '../../components/ui/MultiDeviceBanner'
 import { formatNumber, formatDate, calcWeeksAge } from '../../lib/utils'
 import { useAutoRefreshAtMidnight } from '../../hooks/useAutoRefreshAtMidnight'
 import { linearRegression } from '../../lib/estadistica'
 import {
   Building2, Egg, Skull, TrendingUp, AlertTriangle,
   Package, BarChart3, Activity, Bird, ChevronRight, Calendar,
-  ArrowUp, ArrowDown, Minus, Shield, Layers, Star, Zap,
+  ArrowUp, ArrowDown, Minus, Shield, Layers, Star, Zap, Wheat,
 } from 'lucide-react'
 import {
   ComposedChart, Area, Line, BarChart, Bar,
@@ -26,7 +27,6 @@ function useCountUp(target, duration = 900) {
   const [val, setVal] = useState(0)
   useEffect(() => {
     const n = typeof target === 'number' ? target : 0
-    if (!n) { setVal(0); return }
     let start = null
     let id
     const raf = ts => {
@@ -35,7 +35,11 @@ function useCountUp(target, duration = 900) {
       setVal(Math.floor(p * n))
       if (p < 1) { id = requestAnimationFrame(raf) }
     }
-    id = requestAnimationFrame(raf)
+    if (n) {
+      id = requestAnimationFrame(raf)
+    } else {
+      id = requestAnimationFrame(() => setVal(0))
+    }
     return () => cancelAnimationFrame(id)
   }, [target, duration])
   return val
@@ -662,7 +666,7 @@ export default function Dashboard() {
           .in('galpon_id', galponIds).order('fecha', { ascending: false }).limit(8),
 
         isAdmin
-          ? supabase.from('insumos').select('nombre, stock_actual, stock_minimo').eq('estado', 'activo')
+          ? supabase.from('insumos').select('nombre, categoria, stock_actual, stock_minimo').eq('estado', 'activo')
           : Promise.resolve({ data: null }),
       ])
 
@@ -740,11 +744,14 @@ export default function Dashboard() {
           alertas.push({ type: 'stock', msg: `Stock bajo: "${ins.nombre}" (${ins.stock_actual} unidades)` })
       }
 
-      const totalAlimento14d = (prod14d || []).reduce((s, p) => s + (p.consumo_alimento_kg || 0), 0)
+      const totalAlimento14d = (prod14d || []).reduce((s, p) => s + Number(p.consumo_alimento_kg || 0), 0)
       const totalHuevos14d   = (prod14d || []).reduce((s, p) => s + (p.huevos_producidos  || 0), 0)
+      const consumoHoyKg     = (prod14d || []).filter(p => p.fecha === today).reduce((s, p) => s + Number(p.consumo_alimento_kg || 0), 0)
+      const consumoAyerKg    = (prod14d || []).filter(p => p.fecha === ayer).reduce((s, p) => s + Number(p.consumo_alimento_kg || 0), 0)
+      const alimentoCritico  = (insumosRes.data || []).filter(i => i.categoria === 'alimento' && i.stock_minimo > 0 && Number(i.stock_actual) < Number(i.stock_minimo)).length
 
       return {
-        kpis: { galpones: galponIds.length, lotes: (lotes || []).length, aves, huevosHoy, huevosAyer, bajasHoy, bajasAyer, postura, posturaAyer, semanaHuevos, bajasTotal14d, mortPct14d, posturaMedia14d, supervivenciaMedia, totalAlimento14d, totalHuevos14d },
+        kpis: { galpones: galponIds.length, lotes: (lotes || []).length, aves, huevosHoy, huevosAyer, bajasHoy, bajasAyer, postura, posturaAyer, semanaHuevos, bajasTotal14d, mortPct14d, posturaMedia14d, supervivenciaMedia, totalAlimento14d, totalHuevos14d, consumoHoyKg, consumoAyerKg, alimentoCritico },
         chartData,
         loteHealth,
         recientes: recientes || [],
@@ -786,25 +793,30 @@ export default function Dashboard() {
   return (
     <div className="space-y-5">
 
+      <MultiDeviceBanner />
+
       {/* ══ HERO ══════════════════════════════════════════════════ */}
       <div
-        className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary-800 via-primary-700 to-stone-900 p-6"
+        className="relative overflow-hidden rounded-2xl p-6
+          bg-gradient-to-br from-amber-50 via-primary-50 to-white
+          shadow-[0_2px_4px_rgba(0,0,0,0.04),0_12px_32px_-14px_rgba(217,119,6,0.25)]
+          dark:bg-gradient-to-br dark:from-stone-900 dark:via-primary-950 dark:to-stone-900
+          dark:shadow-[0_10px_50px_-15px_rgba(0,0,0,0.7)]"
         style={anim(0)}
       >
-        <div className="absolute -top-20 -right-20 w-72 h-72 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-16 -left-16 w-60 h-60 bg-primary-400/10 rounded-full blur-2xl pointer-events-none" />
-        <div className="absolute inset-0 bg-grid-pattern opacity-20 pointer-events-none" />
+        <div className="absolute -top-20 -right-20 w-72 h-72 bg-amber-300/40 dark:bg-amber-500/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-16 -left-16 w-60 h-60 bg-primary-300/30 dark:bg-primary-600/20 rounded-full blur-2xl pointer-events-none" />
 
         <div className="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <p className="text-primary-300 text-sm font-medium mb-1">{greeting},</p>
-            <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">{firstName}</h1>
+            <p className="text-primary-700 dark:text-amber-300 text-sm font-medium mb-1">{greeting},</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-stone-900 dark:text-amber-50 tracking-tight">{firstName}</h1>
             <div className="flex flex-wrap items-center gap-2 mt-3">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-sm text-xs text-white/80 font-medium ring-1 ring-white/20">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/80 dark:bg-stone-800/70 backdrop-blur-sm text-xs text-stone-700 dark:text-amber-100 font-medium ring-1 ring-primary-200 dark:ring-amber-500/30">
                 <Calendar className="h-3 w-3" aria-hidden="true" />
                 {format(new Date(), "EEEE, d 'de' MMMM", { locale: es })}
               </span>
-              <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold ring-1 ${isAdmin ? 'bg-amber-500/25 ring-amber-400/40 text-amber-300' : 'bg-blue-500/25 ring-blue-400/40 text-blue-300'}`}>
+              <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold ring-1 ${isAdmin ? 'bg-amber-100 dark:bg-amber-500/20 ring-amber-300 dark:ring-amber-400/40 text-amber-800 dark:text-amber-200' : 'bg-blue-100 dark:bg-blue-500/20 ring-blue-300 dark:ring-blue-400/40 text-blue-800 dark:text-blue-200'}`}>
                 <Shield className="h-3 w-3" aria-hidden="true" />
                 {isAdmin ? 'Administrador' : 'Encargado'}
               </span>
@@ -814,25 +826,25 @@ export default function Dashboard() {
           <div className="flex items-center gap-3 flex-shrink-0">
             {(kpis?.huevosHoy != null) && (
               <>
-                <div className="bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-3 ring-1 ring-white/20 text-center min-w-[88px]">
-                  <p className="text-white/60 text-[10px] uppercase tracking-widest mb-0.5">Huevos hoy</p>
-                  <p className="text-xl font-bold text-white tabular-nums">{formatNumber(kpis.huevosHoy)}</p>
+                <div className="bg-white/80 dark:bg-stone-800/70 backdrop-blur-sm rounded-2xl px-4 py-3 ring-1 ring-primary-200 dark:ring-amber-500/30 text-center min-w-[88px]">
+                  <p className="text-stone-500 dark:text-amber-200/70 text-[10px] uppercase tracking-widest mb-0.5">Huevos hoy</p>
+                  <p className="text-xl font-bold text-stone-900 dark:text-amber-50 tabular-nums">{formatNumber(kpis.huevosHoy)}</p>
                 </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-3 ring-1 ring-white/20 text-center min-w-[88px]">
-                  <p className="text-white/60 text-[10px] uppercase tracking-widest mb-0.5">% Postura</p>
-                  <p className="text-xl font-bold text-amber-300 tabular-nums">{kpis.postura}%</p>
+                <div className="bg-white/80 dark:bg-stone-800/70 backdrop-blur-sm rounded-2xl px-4 py-3 ring-1 ring-primary-200 dark:ring-amber-500/30 text-center min-w-[88px]">
+                  <p className="text-stone-500 dark:text-amber-200/70 text-[10px] uppercase tracking-widest mb-0.5">% Postura</p>
+                  <p className="text-xl font-bold text-primary-700 dark:text-amber-200 tabular-nums">{kpis.postura}%</p>
                 </div>
               </>
             )}
-            <div className="hidden lg:flex w-14 h-14 bg-white/10 backdrop-blur-sm rounded-2xl ring-1 ring-white/20 items-center justify-center">
-              <Bird className="h-7 w-7 text-amber-300" aria-hidden="true" />
+            <div className="hidden lg:flex w-14 h-14 bg-gradient-to-br from-primary-500 to-primary-700 dark:from-amber-400 dark:to-primary-600 rounded-2xl shadow-lg shadow-primary-500/30 dark:shadow-amber-500/30 items-center justify-center">
+              <Bird className="h-7 w-7 text-white" aria-hidden="true" />
             </div>
           </div>
         </div>
       </div>
 
       {/* ══ KPIs ════════════════════════════════════════════════ */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
         <KpiCard noMotion={noMotion} delay={60}  label="Galpones activos"  rawValue={kpis?.galpones}      value={formatNumber(kpis?.galpones)}     icon={Building2}  gradient="from-blue-400 to-blue-600"     sub={`${kpis?.lotes ?? 0} lotes activos`} />
         <KpiCard noMotion={noMotion} delay={110} label="Aves en producción" rawValue={kpis?.aves}           value={formatNumber(kpis?.aves)}          icon={Activity}   gradient="from-emerald-400 to-emerald-600" />
         <KpiCard noMotion={noMotion} delay={160} label="Huevos hoy"         rawValue={kpis?.huevosHoy}      value={formatNumber(kpis?.huevosHoy)}     icon={Egg}        gradient="from-amber-400 to-amber-600"   sub="vs ayer"
@@ -845,7 +857,51 @@ export default function Dashboard() {
           trend={<TrendBadge current={parseFloat(kpis?.postura ?? 0)} previous={parseFloat(kpis?.posturaAyer ?? 0)} />}
         />
         <KpiCard noMotion={noMotion} delay={310} label="Huevos esta semana" rawValue={kpis?.semanaHuevos}   value={formatNumber(kpis?.semanaHuevos)}  icon={Star}       gradient="from-rose-400 to-rose-600"     sub="últimos 7 días" />
+        <Link to="/dashboard/alimentacion" className="block">
+          <KpiCard noMotion={noMotion} delay={360}
+            label="Consumo alimento hoy"
+            value={`${formatNumber(Math.round(kpis?.consumoHoyKg ?? 0))} kg`}
+            icon={Wheat}
+            gradient="from-orange-400 to-amber-600"
+            sub={kpis?.alimentoCritico > 0 ? `⚠ ${kpis.alimentoCritico} alimento${kpis.alimentoCritico > 1 ? 's' : ''} bajo mínimo` : 'vs ayer'}
+            trend={kpis?.alimentoCritico > 0 ? null : <TrendBadge current={kpis?.consumoHoyKg ?? 0} previous={kpis?.consumoAyerKg ?? 0} />}
+          />
+        </Link>
       </div>
+
+      {/* ══ GEMELO DIGITAL — acceso destacado ══════════════════ */}
+      <Link
+        to="/dashboard/gemelo-digital"
+        className="relative block overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 via-emerald-700 to-stone-900 p-5 group hover:shadow-2xl transition-all"
+        style={anim(355)}
+      >
+        <div className="absolute -top-16 -right-16 w-56 h-56 bg-emerald-400/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-amber-400/10 rounded-full blur-2xl pointer-events-none" />
+        <div className="relative flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-sm ring-1 ring-white/20 flex items-center justify-center flex-shrink-0">
+              <Zap className="h-6 w-6 text-emerald-300" aria-hidden="true" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="text-white font-bold text-base sm:text-lg leading-tight">Gemelo Digital</p>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-400 text-emerald-950 leading-none tracking-wider">NUEVO</span>
+                <span className="inline-flex items-center gap-1 text-[10px] text-emerald-300 font-semibold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  LIVE
+                </span>
+              </div>
+              <p className="text-white/70 text-xs mt-0.5 leading-snug max-w-md">
+                Vista panorámica en tiempo real de todos los galpones con health score por lote y detección temprana de alertas.
+              </p>
+            </div>
+          </div>
+          <div className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/10 backdrop-blur-sm text-white text-xs font-semibold ring-1 ring-white/20 group-hover:bg-white/20 transition-colors">
+            Abrir vista panorámica
+            <ChevronRight className="h-3.5 w-3.5" />
+          </div>
+        </div>
+      </Link>
 
       {/* ══ ANALYTICS BAR ══════════════════════════════════════ */}
       <AnalyticsBar kpis={kpis} posturaConfig={posturaConfig} noMotion={noMotion} />

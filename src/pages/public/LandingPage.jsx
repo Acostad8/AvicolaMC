@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { useA11y } from '../../context/AccessibilityContext'
 import DashboardMockup from '../../components/landing/DashboardMockup'
+import HowItWorksDemo from '../../components/landing/HowItWorksDemo'
 
 /* ── Hooks ── */
 function useScrollAnimation(threshold = 0.15) {
@@ -1314,6 +1315,14 @@ export default function LandingPage() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* ── Animated demo ── */}
+            <div className={`mt-16 ${!noMotion ? `transition-all duration-700 delay-500 ${stepsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}` : ''}`}>
+              <HowItWorksDemo noMotion={noMotion} />
+              <p className="mt-4 text-center text-xs text-stone-400 dark:text-stone-500">
+                Demostración animada · pasa el cursor para pausar
+              </p>
             </div>
           </div>
         </section>

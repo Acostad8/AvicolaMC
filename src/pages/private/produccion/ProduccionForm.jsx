@@ -5,9 +5,13 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
+import { db } from '../../../lib/db'
+import { enqueueOp, applyLocal, uuid } from '../../../lib/outbox'
+import { useOnlineStatus } from '../../../hooks/useOnlineStatus'
 import { useAuth } from '../../../context/AuthContext'
 import { calcPostura } from '../../../lib/utils'
 import { useConfig } from '../../../context/ConfigContext'
+import { useAlertasUmbrales } from '../../../hooks/useAlertasUmbrales'
 import Input from '../../../components/ui/Input'
 import Select from '../../../components/ui/Select'
 import Textarea from '../../../components/ui/Textarea'
@@ -17,8 +21,8 @@ import PageHeader from '../../../components/ui/PageHeader'
 import toast from 'react-hot-toast'
 import {
   Egg, AlertCircle, CheckCircle2, Info, Layers,
-  Clock, AlertTriangle, Building2, CalendarDays,
-  Wheat, FileText, TrendingUp,
+  Clock, AlertTriangle, CalendarDays,
+  FileText, TrendingUp, Wheat,
 } from 'lucide-react'
 
 const schema = z.object({
@@ -100,6 +104,7 @@ function PreviewCard({
   fecha, galponNombre, loteNombre, avesRef, razaNombre,
   huevos, consumo, posturaCalc, fueraDePlazo,
   horasRestantes, minutosRestantes, isEdit, hasLote, duplicado, superaAves,
+  galponAlimento, unidadesDesc, stockPost, stockInsuficiente,
 }) {
   const checks = isEdit ? [
     { ok: !!fecha,            text: 'Fecha definida' },
@@ -185,6 +190,28 @@ function PreviewCard({
           </div>
         )}
 
+        {/* Descuento de alimento */}
+        {galponAlimento && Number(consumo) > 0 && (
+          <div className={`rounded-xl border-2 p-3 space-y-2 ${stockInsuficiente ? 'border-amber-300 dark:border-amber-800 bg-amber-50/40 dark:bg-amber-950/20' : 'border-emerald-200 dark:border-emerald-800 bg-emerald-50/40 dark:bg-emerald-950/20'}`}>
+            <div className="flex items-center gap-2">
+              <Wheat className={`h-3.5 w-3.5 ${stockInsuficiente ? 'text-amber-600' : 'text-emerald-600'}`} />
+              <p className="text-xs font-semibold text-stone-700 dark:text-stone-200">Descuento de alimento</p>
+            </div>
+            <div className="text-xs text-stone-600 dark:text-stone-300 space-y-1">
+              <p className="truncate"><strong>{galponAlimento.nombre}</strong></p>
+              <p className="tabular-nums">
+                {galponAlimento.stock_actual.toLocaleString('es-CO')} {galponAlimento.unidad_medida}
+                <span className="text-stone-400 mx-1">−</span>
+                <span className={stockInsuficiente ? 'text-amber-700 dark:text-amber-400 font-semibold' : 'text-red-600 dark:text-red-400 font-semibold'}>
+                  {unidadesDesc.toLocaleString('es-CO')}
+                </span>
+                <span className="text-stone-400 mx-1">=</span>
+                <span className="font-bold">{stockPost.toLocaleString('es-CO')} {galponAlimento.unidad_medida}</span>
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Tiempo restante */}
         {isEdit && !fueraDePlazo && (
           <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2.5">
@@ -226,7 +253,9 @@ export default function ProduccionForm() {
   const isEdit = !!id
   const navigate = useNavigate()
   const { isAdmin, perfil } = useAuth()
+  const online = useOnlineStatus()
   const qc = useQueryClient()
+  const { checkStockMinimo } = useAlertasUmbrales()
   const [posturaCalc, setPosturaCalc]     = useState(null)
   const [confirmOpen, setConfirmOpen]     = useState(false)
   const [pendingValues, setPendingValues] = useState(null)
@@ -249,7 +278,6 @@ export default function ProduccionForm() {
   const huevos   = watch('huevos_producidos')
   const consumo  = watch('consumo_alimento_kg')
   const fecha    = watch('fecha')
-  const observaciones = watch('observaciones')
 
   /* ── Registro existente (solo edición) ── */
   const { data: registro } = useQuery({
@@ -287,12 +315,33 @@ export default function ProduccionForm() {
   const { data: galpones } = useQuery({
     queryKey: ['galpones-select', isAdmin, perfil?.id],
     queryFn: async () => {
-      let q = supabase.from('galpones').select('id, nombre').eq('estado', 'en_produccion').order('nombre')
+      let q = supabase.from('galpones').select('id, nombre, insumo_alimento_id').eq('estado', 'en_produccion').order('nombre')
       if (!isAdmin) q = q.eq('encargado_id', perfil.id)
       const { data } = await q
       return data || []
     },
     enabled: !!perfil && !isEdit,
+  })
+
+  /* ── Galpón del registro (edición) ── */
+  const galponIdActual = isEdit ? registro?.galpon_id : galponId
+  const { data: galponAlimento } = useQuery({
+    queryKey: ['galpon-alimento', galponIdActual],
+    queryFn: async () => {
+      const { data: g } = await supabase
+        .from('galpones')
+        .select('insumo_alimento_id')
+        .eq('id', galponIdActual)
+        .single()
+      if (!g?.insumo_alimento_id) return null
+      const { data: ins } = await supabase
+        .from('insumos')
+        .select('id, nombre, unidad_medida, kg_por_unidad, stock_actual')
+        .eq('id', g.insumo_alimento_id)
+        .single()
+      return ins
+    },
+    enabled: !!galponIdActual,
   })
 
   /* ── Lote activo del galpón (solo creación) ── */
@@ -344,7 +393,15 @@ export default function ProduccionForm() {
     }
   }, [isEdit, isAdmin, registro, fueraDePlazo, navigate, id])
 
-  const isDisabled = fueraDePlazo || !!duplicado || (!isEdit && (!loteActivo || !!superaAves))
+  /* ── Conversión kg → unidades del insumo ── */
+  const kgPorUnidad = galponAlimento?.kg_por_unidad || 1
+  const consumoNum  = Number(consumo) || 0
+  const unidadesDesc = consumoNum > 0 ? Math.round((consumoNum / kgPorUnidad) * 100) / 100 : 0
+  const stockPost    = galponAlimento ? Math.max(0, galponAlimento.stock_actual - unidadesDesc) : 0
+  const stockInsuficiente = galponAlimento && unidadesDesc > galponAlimento.stock_actual
+  const sinAlimentoAsignado = galponIdActual && consumoNum > 0 && !galponAlimento
+
+  const isDisabled = fueraDePlazo || !!duplicado || !!stockInsuficiente || (!isEdit && (!loteActivo || !!superaAves))
 
   /* ── Preview data ── */
   const previewGalponNombre = isEdit ? registro?.galpon?.nombre : (galpones || []).find(g => g.id === galponId)?.nombre
@@ -354,6 +411,17 @@ export default function ProduccionForm() {
   /* ── Mutation ── */
   const mutation = useMutation({
     mutationFn: async (values) => {
+      // Validación stock alimento (re-chequear contra DB para evitar race condition)
+      if (Number(values.consumo_alimento_kg) > 0 && galponAlimento) {
+        const unidadesReq = Number(values.consumo_alimento_kg) / (Number(galponAlimento.kg_por_unidad) || 1)
+        const { data: fresh } = await supabase
+          .from('insumos').select('stock_actual').eq('id', galponAlimento.id).single()
+        const stockFresco = Number(fresh?.stock_actual ?? 0)
+        if (unidadesReq > stockFresco) {
+          throw new Error(`Stock insuficiente de ${galponAlimento.nombre}: se requieren ${unidadesReq.toFixed(2)} ${galponAlimento.unidad_medida}s, disponibles ${stockFresco}`)
+        }
+      }
+
       if (isEdit) {
         if (fueraDePlazo) throw new Error('El período de edición de 24 horas ha vencido')
         if (duplicado)    throw new Error('Ya existe un registro de producción para este galpón en esa fecha')
@@ -398,30 +466,85 @@ export default function ProduccionForm() {
         if (!loteActivo) throw new Error('No hay lote activo en este galpón')
         if (superaAves)  throw new Error(`Los huevos (${values.huevos_producidos}) no pueden superar las aves activas (${loteActivo.cantidad_aves_actuales})`)
 
-        const { data: dupCheck } = await supabase
-          .from('produccion')
-          .select('id')
-          .eq('galpon_id', values.galpon_id)
-          .eq('fecha', values.fecha)
-          .maybeSingle()
-        if (dupCheck) throw new Error('Ya existe un registro de producción para este galpón en esta fecha')
-
         const postura = calcPostura(values.huevos_producidos, loteActivo.cantidad_aves_actuales)
-        const { error } = await supabase.from('produccion').insert({
-          ...values,
-          lote_id:            loteActivo.id,
-          porcentaje_postura: postura,
-          registrado_por:     perfil.id,
-        })
-        if (error) throw error
+        const client_id = uuid()
+        const nowIso = new Date().toISOString()
+        const record = {
+          id: client_id,
+          client_id,
+          fecha:               values.fecha,
+          galpon_id:           values.galpon_id,
+          lote_id:             loteActivo.id,
+          huevos_producidos:   values.huevos_producidos,
+          consumo_alimento_kg: values.consumo_alimento_kg,
+          porcentaje_postura:  postura,
+          observaciones:       values.observaciones || null,
+          registrado_por:      perfil.id,
+          created_at:          nowIso,
+          updated_at:          nowIso,
+        }
+
+        if (online) {
+          const { data: dupCheck } = await supabase
+            .from('produccion')
+            .select('id')
+            .eq('galpon_id', values.galpon_id)
+            .eq('fecha', values.fecha)
+            .maybeSingle()
+          if (dupCheck) throw new Error('Ya existe un registro de producción para este galpón en esta fecha')
+
+          const { data, error } = await supabase
+            .from('produccion')
+            .insert(record)
+            .select()
+            .maybeSingle()
+          if (error) throw error
+          if (data) await applyLocal('produccion', data)
+        } else {
+          const dupLocal = await db.produccion
+            .where({ galpon_id: values.galpon_id, fecha: values.fecha })
+            .first()
+          if (dupLocal) throw new Error('Ya existe un registro de producción para este galpón en esta fecha (local)')
+
+          await applyLocal('produccion', record)
+          await enqueueOp({
+            table: 'produccion',
+            op: 'insert',
+            payload: record,
+            client_id,
+          })
+          return { offline: true }
+        }
       }
     },
-    onSuccess: () => {
+    onSuccess: async (result) => {
       qc.invalidateQueries({ queryKey: ['produccion'] })
       qc.invalidateQueries({ queryKey: ['produccion-detalle', id] })
       qc.invalidateQueries({ queryKey: ['auditoria-produccion', id] })
       qc.invalidateQueries({ queryKey: ['dashboard-v2'] })
-      toast.success(isEdit ? 'Registro actualizado correctamente' : 'Producción registrada correctamente')
+      qc.invalidateQueries({ queryKey: ['insumos'] })
+      qc.invalidateQueries({ queryKey: ['insumos-activos'] })
+      qc.invalidateQueries({ queryKey: ['galpon-alimento'] })
+
+      if (online && galponAlimento && Number(galponAlimento.stock_minimo) > 0) {
+        const { data: fresh } = await supabase
+          .from('insumos').select('stock_actual, stock_minimo, unidad_medida')
+          .eq('id', galponAlimento.id).single()
+        if (fresh) {
+          checkStockMinimo({
+            insumoNombre: galponAlimento.nombre,
+            stockPost:    Number(fresh.stock_actual),
+            stockMinimo:  Number(fresh.stock_minimo),
+            unidad:       fresh.unidad_medida,
+          })
+        }
+      }
+
+      if (result?.offline) {
+        toast.success('Guardado localmente. Se sincronizará al reconectar.')
+      } else {
+        toast.success(isEdit ? 'Registro actualizado correctamente' : 'Producción registrada correctamente')
+      }
       navigate(isEdit ? `/dashboard/produccion/${id}` : '/dashboard/produccion')
     },
     onError: e => toast.error(e.message || 'Error al guardar'),
@@ -568,17 +691,36 @@ export default function ProduccionForm() {
                   </p>
                 )}
               </div>
-              <Input
-                label="Consumo de alimento (kg)"
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="0.00"
-                error={errors.consumo_alimento_kg?.message}
-                disabled={fueraDePlazo}
-                {...register('consumo_alimento_kg')}
-              />
+              <div>
+                <Input
+                  label="Consumo de alimento (kg)"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  error={errors.consumo_alimento_kg?.message}
+                  disabled={fueraDePlazo}
+                  {...register('consumo_alimento_kg')}
+                />
+                {galponAlimento && consumoNum > 0 && (
+                  <p className="text-xs text-stone-500 dark:text-stone-400 mt-1.5">
+                    ≈ <strong className="text-stone-700 dark:text-stone-200 tabular-nums">{unidadesDesc.toLocaleString('es-CO')} {galponAlimento.unidad_medida}{unidadesDesc !== 1 ? 's' : ''}</strong> de <strong>{galponAlimento.nombre}</strong>
+                  </p>
+                )}
+              </div>
             </div>
+
+            {sinAlimentoAsignado && (
+              <InfoBox type="warning">
+                Este galpón no tiene un insumo de alimento asignado. El consumo se registrará pero no se descontará del stock. Asigná uno en la ficha del galpón.
+              </InfoBox>
+            )}
+
+            {stockInsuficiente && !fueraDePlazo && (
+              <InfoBox type="error">
+                Stock insuficiente: se intentan descontar <strong>{unidadesDesc} {galponAlimento.unidad_medida}s</strong> pero solo hay <strong>{galponAlimento.stock_actual} {galponAlimento.unidad_medida}s</strong> disponibles ({Math.round(galponAlimento.stock_actual * kgPorUnidad)} kg). Registrá una entrada de inventario antes de guardar.
+              </InfoBox>
+            )}
 
             {posturaCalc !== null && !superaAves && !fueraDePlazo && (
               <div className="border border-stone-100 dark:border-stone-800 rounded-xl p-4">
@@ -636,6 +778,10 @@ export default function ProduccionForm() {
           hasLote={!!loteActivo}
           duplicado={!!duplicado}
           superaAves={!!superaAves}
+          galponAlimento={galponAlimento}
+          unidadesDesc={unidadesDesc}
+          stockPost={stockPost}
+          stockInsuficiente={stockInsuficiente}
         />
       </div>
 

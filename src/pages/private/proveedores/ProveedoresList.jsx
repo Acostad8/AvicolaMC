@@ -3,16 +3,17 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
 import { TIPOS_PROVEEDOR } from '../../../lib/utils'
+import { useViewMode } from '../../../hooks/useViewMode'
 import {
   Plus, Eye, Pencil, Truck, Package, Bird, Layers,
   MoreHorizontal, Search, Phone, Mail, CheckCircle2,
-  XCircle, Filter, Users,
+  XCircle, Filter, LayoutGrid, List,
 } from 'lucide-react'
 import Button from '../../../components/ui/Button'
 import PageHeader from '../../../components/ui/PageHeader'
 import Pagination from '../../../components/ui/Pagination'
 import EmptyState from '../../../components/ui/EmptyState'
-import { Skeleton } from '../../../components/ui/Skeleton'
+import { Skeleton, TableSkeleton } from '../../../components/ui/Skeleton'
 
 /* ── Mapa visual por tipo ── */
 const TIPO_META = {
@@ -158,6 +159,7 @@ export default function ProveedoresList() {
   const [filterTipo,   setFilterTipo]   = useState('')
   const [page,         setPage]         = useState(1)
   const [pageSize,     setPageSize]     = useState(12)
+  const [view,         setView]         = useViewMode('proveedores', 'cards')
 
   const { data, isLoading } = useQuery({
     queryKey: ['proveedores'],
@@ -168,7 +170,7 @@ export default function ProveedoresList() {
     },
   })
 
-  const todos = data || []
+  const todos = useMemo(() => data || [], [data])
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim()
@@ -184,7 +186,6 @@ export default function ProveedoresList() {
 
   /* Stats */
   const activos   = todos.filter(p => p.estado === 'activo').length
-  const inactivos = todos.filter(p => p.estado === 'inactivo').length
   const deInsumos = todos.filter(p => p.tipo_proveedor === 'insumos' || p.tipo_proveedor === 'ambos').length
   const deRazas   = todos.filter(p => p.tipo_proveedor === 'razas'   || p.tipo_proveedor === 'ambos').length
 
@@ -240,35 +241,146 @@ export default function ProveedoresList() {
             {TIPOS_PROVEEDOR.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
         </div>
+
+        <div className="flex items-center gap-1 bg-stone-100 dark:bg-stone-800 rounded-xl p-1 self-center">
+          <button
+            onClick={() => setView('cards')}
+            aria-label="Vista en tarjetas"
+            className={`p-1.5 rounded-lg transition-all ${view === 'cards' ? 'bg-white dark:bg-stone-700 shadow-sm text-primary-600 dark:text-primary-400' : 'text-stone-400 dark:text-stone-500 hover:text-stone-600 dark:hover:text-stone-300'}`}
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setView('table')}
+            aria-label="Vista en tabla"
+            className={`p-1.5 rounded-lg transition-all ${view === 'table' ? 'bg-white dark:bg-stone-700 shadow-sm text-primary-600 dark:text-primary-400' : 'text-stone-400 dark:text-stone-500 hover:text-stone-600 dark:hover:text-stone-300'}`}
+          >
+            <List className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
-      {/* ── Grid de tarjetas ── */}
-      {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {[...Array(8)].map((_, i) => <CardSkeleton key={i} />)}
-        </div>
-      ) : paginated.length === 0 ? (
-        <EmptyState
-          icon={Truck}
-          title={filtered.length === 0 && todos.length > 0 ? 'Sin resultados' : 'No hay proveedores'}
-          description={filtered.length === 0 && todos.length > 0
-            ? 'Intenta ajustar los filtros de búsqueda.'
-            : 'Registra el primer proveedor usando el botón superior.'
-          }
-        />
-      ) : (
-        <>
+      {/* ── CARDS VIEW ── */}
+      {view === 'cards' && (
+        isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {paginated.map(p => <ProveedorCard key={p.id} p={p} />)}
+            {[...Array(8)].map((_, i) => <CardSkeleton key={i} />)}
           </div>
-
-          {/* Contador + paginación */}
-          <div className="card overflow-hidden">
-            <div className="px-4 py-2.5 flex items-center justify-between border-b border-stone-100 dark:border-stone-800">
-              <p className="text-xs text-stone-400 dark:text-stone-500">
-                Mostrando <strong className="text-stone-600 dark:text-stone-300">{paginated.length}</strong> de <strong className="text-stone-600 dark:text-stone-300">{filtered.length}</strong> proveedores
-              </p>
+        ) : paginated.length === 0 ? (
+          <EmptyState
+            icon={Truck}
+            title={filtered.length === 0 && todos.length > 0 ? 'Sin resultados' : 'No hay proveedores'}
+            description={filtered.length === 0 && todos.length > 0
+              ? 'Intenta ajustar los filtros de búsqueda.'
+              : 'Registra el primer proveedor usando el botón superior.'
+            }
+          />
+        ) : (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {paginated.map(p => <ProveedorCard key={p.id} p={p} />)}
             </div>
+
+            {/* Contador + paginación */}
+            <div className="card overflow-hidden">
+              <div className="px-4 py-2.5 flex items-center justify-between border-b border-stone-100 dark:border-stone-800">
+                <p className="text-xs text-stone-400 dark:text-stone-500">
+                  Mostrando <strong className="text-stone-600 dark:text-stone-300">{paginated.length}</strong> de <strong className="text-stone-600 dark:text-stone-300">{filtered.length}</strong> proveedores
+                </p>
+              </div>
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                pageSize={pageSize}
+                onPageSizeChange={n => { setPageSize(n); setPage(1) }}
+                pageSizeOptions={[12, 24, 48]}
+              />
+            </div>
+          </>
+        )
+      )}
+
+      {/* ── TABLE VIEW ── */}
+      {view === 'table' && (
+        <div className="card overflow-hidden">
+          {isLoading ? <TableSkeleton rows={5} cols={6} /> : paginated.length === 0 ? (
+            <EmptyState
+              icon={Truck}
+              title={filtered.length === 0 && todos.length > 0 ? 'Sin resultados' : 'No hay proveedores'}
+              description={filtered.length === 0 && todos.length > 0
+                ? 'Intenta ajustar los filtros de búsqueda.'
+                : 'Registra el primer proveedor usando el botón superior.'
+              }
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-stone-50 dark:bg-stone-800/50 border-b border-stone-200 dark:border-stone-700">
+                  <tr>
+                    {['Proveedor', 'Tipo', 'Teléfono', 'Correo', 'Estado', 'Acciones'].map(h => (
+                      <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
+                  {paginated.map(p => {
+                    const meta = getMeta(p.tipo_proveedor)
+                    const { Icon } = meta
+                    const isActivo = p.estado === 'activo'
+                    return (
+                      <tr key={p.id} className="hover:bg-stone-50 dark:hover:bg-stone-800/40 transition-colors">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${meta.grad} flex items-center justify-center flex-shrink-0 shadow-sm`}>
+                              <span className="text-white font-bold text-[11px] select-none">{getInitials(p.nombre)}</span>
+                            </div>
+                            <span className="font-semibold text-stone-800 dark:text-stone-100 truncate max-w-[220px]">{p.nombre}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${meta.badge}`}>
+                            <Icon className="h-3 w-3" />
+                            {meta.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-stone-600 dark:text-stone-400">
+                          {p.telefono || <span className="text-stone-400 dark:text-stone-600 text-xs">—</span>}
+                        </td>
+                        <td className="px-4 py-3 text-stone-600 dark:text-stone-400">
+                          {p.correo
+                            ? <span className="truncate block max-w-[220px]">{p.correo}</span>
+                            : <span className="text-stone-400 dark:text-stone-600 text-xs">—</span>
+                          }
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
+                            isActivo
+                              ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400'
+                              : 'bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400'
+                          }`}>
+                            {isActivo ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                            {isActivo ? 'Activo' : 'Inactivo'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <Link to={`/dashboard/proveedores/${p.id}`}>
+                              <Button variant="secondary" size="sm" icon={Eye}>Ver</Button>
+                            </Link>
+                            <Link to={`/dashboard/proveedores/${p.id}/editar`}>
+                              <Button variant="secondary" size="sm" icon={Pencil}>Editar</Button>
+                            </Link>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {filtered.length > 0 && (
             <Pagination
               page={page}
               totalPages={totalPages}
@@ -277,8 +389,8 @@ export default function ProveedoresList() {
               onPageSizeChange={n => { setPageSize(n); setPage(1) }}
               pageSizeOptions={[12, 24, 48]}
             />
-          </div>
-        </>
+          )}
+        </div>
       )}
     </div>
   )

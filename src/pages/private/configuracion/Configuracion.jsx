@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -15,7 +15,6 @@ import Button from '../../../components/ui/Button'
 import Input from '../../../components/ui/Input'
 import { useA11y } from '../../../context/AccessibilityContext'
 import { useConfig } from '../../../context/ConfigContext'
-import { useAuth } from '../../../context/AuthContext'
 import { useNotifications } from '../../../context/NotificationsContext'
 import RazasList from '../razas/RazasList'
 import toast from 'react-hot-toast'
@@ -47,7 +46,6 @@ const produccionSchema = z.object({
   alerta_mortalidad:       z.coerce.number().min(0).max(100),
   umbral_dias_tratamiento: z.coerce.number().int().min(1).max(365),
   peso_promedio_huevo_g:   z.coerce.number().min(30).max(120),
-  peso_saco_kg:            z.coerce.number().min(1).max(1000),
 }).refine(d => d.postura_excelente > d.postura_buena, {
   message: 'Excelente debe ser mayor que Buena',
   path: ['postura_excelente'],
@@ -126,7 +124,7 @@ function Toggle({ checked, onChange, label, description, icon: Icon }) {
 function TabEmpresa() {
   const { config, saveSection } = useConfig()
 
-  const { register, handleSubmit, formState: { errors, isDirty } } = useForm({
+  const { register, handleSubmit, formState: { errors } } = useForm({
     resolver: zodResolver(empresaSchema),
     defaultValues: config.granja,
   })
@@ -237,7 +235,6 @@ function TabProduccion() {
       alerta_mortalidad:       Number(values.alerta_mortalidad),
       umbral_dias_tratamiento: Number(values.umbral_dias_tratamiento),
       peso_promedio_huevo_g:   Number(values.peso_promedio_huevo_g),
-      peso_saco_kg:            Number(values.peso_saco_kg),
     })
     toast.success('Umbrales de producción guardados')
   }
@@ -368,36 +365,6 @@ function TabProduccion() {
             {...register('peso_promedio_huevo_g')}
           />
         </div>
-      </div>
-
-      {/* Peso por saco de alimento */}
-      <div>
-        <div className="flex items-center gap-3 pb-4 border-b border-stone-100 dark:border-stone-800 mb-4">
-          <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center shadow-sm">
-            <Package className="h-5 w-5 text-white" />
-          </div>
-          <div>
-            <p className="font-semibold text-stone-800 dark:text-stone-100 text-sm">Peso por saco de alimento</p>
-            <p className="text-xs text-stone-400 dark:text-stone-500">
-              Usado para estimar la autonomía de stock cuando el inventario está en sacos, bultos o costales
-            </p>
-          </div>
-        </div>
-        <div className="sm:w-64">
-          <Input
-            label="Kilogramos por saco (1 – 1000)"
-            type="number"
-            min="1"
-            max="1000"
-            step="0.5"
-            error={errors.peso_saco_kg?.message}
-            {...register('peso_saco_kg')}
-          />
-        </div>
-        <p className="text-xs text-stone-400 dark:text-stone-500 mt-2">
-          Aplica a insumos registrados con unidad: <span className="font-medium text-stone-600 dark:text-stone-300">saco, bulto, costal</span>.
-          El valor típico en Colombia es 40 kg.
-        </p>
       </div>
 
       <div className="flex justify-end pt-2 border-t border-stone-100 dark:border-stone-800">
@@ -727,7 +694,6 @@ function TabApariencia() {
 ═══════════════════════════════════════════════ */
 export default function Configuracion() {
   const [activeTab, setActiveTab] = useState('empresa')
-  const { isAdmin } = useAuth()
 
   return (
     <div className="space-y-5">

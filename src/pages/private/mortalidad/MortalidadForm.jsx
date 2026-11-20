@@ -5,6 +5,9 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
+import { db } from '../../../lib/db'
+import { enqueueOp, applyLocal, uuid } from '../../../lib/outbox'
+import { useOnlineStatus } from '../../../hooks/useOnlineStatus'
 import { useAuth } from '../../../context/AuthContext'
 import { CAUSAS_MORTALIDAD } from '../../../lib/utils'
 import Input from '../../../components/ui/Input'
@@ -49,7 +52,7 @@ function FormSection({ icon: Icon, title, gradient, children }) {
 }
 
 function PreviewCard({
-  fecha, galponNombre, loteNombre, avesActuales, topeDisponible,
+  fecha, galponNombre, loteNombre, topeDisponible,
   cantidadBajas, causaLabel, isEdit, hasLote, superaBajas,
 }) {
   const bajas    = Number(cantidadBajas) || 0
@@ -164,6 +167,7 @@ export default function MortalidadForm() {
   const isEdit = !!id
   const navigate = useNavigate()
   const { isAdmin, perfil } = useAuth()
+  const online = useOnlineStatus()
   const qc = useQueryClient()
 
   const { checkMortalidad } = useAlertasUmbrales()
@@ -177,7 +181,6 @@ export default function MortalidadForm() {
   const causa         = watch('causa')
   const cantidadBajas = watch('cantidad_bajas')
   const fecha         = watch('fecha')
-  const observaciones = watch('observaciones')
 
   const [confirmOpen, setConfirmOpen]     = useState(false)
   const [pendingValues, setPendingValues] = useState(null)
@@ -303,19 +306,42 @@ export default function MortalidadForm() {
         if (values.cantidad_bajas > loteActivo.cantidad_aves_actuales) {
           throw new Error(`Las bajas (${values.cantidad_bajas}) no pueden superar las aves activas (${loteActivo.cantidad_aves_actuales})`)
         }
-        const { error } = await supabase.from('mortalidad').insert({
-          ...values,
-          lote_id:        loteActivo.id,
-          causa_otra:     values.causa === 'otra' ? values.causa_otra : null,
-          registrado_por: perfil.id,
-        })
-        if (error) throw error
 
-        const nuevaCantidad = Math.max(0, loteActivo.cantidad_aves_actuales - values.cantidad_bajas)
-        await supabase.from('lotes').update({ cantidad_aves_actuales: nuevaCantidad }).eq('id', loteActivo.id)
+        const client_id = uuid()
+        const nowIso = new Date().toISOString()
+        const record = {
+          id: client_id,
+          client_id,
+          fecha:          values.fecha,
+          galpon_id:      values.galpon_id,
+          lote_id:        loteActivo.id,
+          cantidad_bajas: Number(values.cantidad_bajas),
+          causa:          values.causa,
+          causa_otra:     values.causa === 'otra' ? (values.causa_otra || null) : null,
+          observaciones:  values.observaciones || null,
+          registrado_por: perfil.id,
+          created_at:     nowIso,
+          updated_at:     nowIso,
+        }
+
+        if (online) {
+          const { data, error } = await supabase
+            .from('mortalidad')
+            .insert(record)
+            .select()
+            .maybeSingle()
+          if (error) throw error
+          if (data) await applyLocal('mortalidad', data)
+        } else {
+          await applyLocal('mortalidad', record)
+          await enqueueOp({ table: 'mortalidad', op: 'insert', payload: record, client_id })
+          const nuevaCantidad = Math.max(0, loteActivo.cantidad_aves_actuales - record.cantidad_bajas)
+          await db.lotes.update(loteActivo.id, { cantidad_aves_actuales: nuevaCantidad })
+          return { offline: true }
+        }
       }
     },
-    onSuccess: (_, values) => {
+    onSuccess: (result, values) => {
       if (!isEdit && loteActivo) {
         checkMortalidad({
           cantidadBajas: Number(values.cantidad_bajas),
@@ -329,7 +355,11 @@ export default function MortalidadForm() {
       qc.invalidateQueries({ queryKey: ['lotes'] })
       qc.invalidateQueries({ queryKey: ['lote-activo'] })
       qc.invalidateQueries({ queryKey: ['dashboard-v2'] })
-      toast.success(isEdit ? 'Registro actualizado correctamente' : 'Mortalidad registrada correctamente')
+      if (result?.offline) {
+        toast.success('Guardado localmente. Se sincronizará al reconectar.')
+      } else {
+        toast.success(isEdit ? 'Registro actualizado correctamente' : 'Mortalidad registrada correctamente')
+      }
       navigate(isEdit ? `/dashboard/mortalidad/${id}` : '/dashboard/mortalidad')
     },
     onError: e => toast.error(e.message || 'Error al guardar'),

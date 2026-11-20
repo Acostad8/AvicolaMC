@@ -1,13 +1,19 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { QueryClientProvider } from '@tanstack/react-query'
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { queryClient } from './lib/queryClient'
+import { createIdbPersister } from './lib/queryPersister'
 import { Toaster } from 'react-hot-toast'
+import { renderToast } from './components/ui/Toast'
 import { AuthProvider } from './context/AuthContext'
 import { AccessibilityProvider } from './context/AccessibilityContext'
 import { ConfigProvider } from './context/ConfigContext'
 import { NotificationsProvider } from './context/NotificationsContext'
 import AccessibilityPanel from './components/ui/AccessibilityPanel'
+import { UpdatePrompt } from './components/ui/PWABadges'
+import { OfflineBootstrap } from './components/system/OfflineBootstrap'
+
+const idbPersister = createIdbPersister()
 import ProtectedRoute, { AdminRoute } from './components/auth/ProtectedRoute'
 import PrivateLayout from './components/layout/PrivateLayout'
 
@@ -54,6 +60,9 @@ const InsumoForm     = lazy(() => import('./pages/private/insumos/InsumoForm'))
 const InsumoDetalle  = lazy(() => import('./pages/private/insumos/InsumoDetalle'))
 const MovimientoForm = lazy(() => import('./pages/private/insumos/MovimientoForm'))
 
+// Alimentación
+const Alimentacion = lazy(() => import('./pages/private/alimentacion/Alimentacion'))
+
 // Empleados
 const EmpleadosList   = lazy(() => import('./pages/private/empleados/EmpleadosList'))
 const EmpleadoForm    = lazy(() => import('./pages/private/empleados/EmpleadoForm'))
@@ -74,6 +83,8 @@ const Reportes       = lazy(() => import('./pages/private/Reportes'))
 const Configuracion  = lazy(() => import('./pages/private/configuracion/Configuracion'))
 const Auditoria      = lazy(() => import('./pages/private/auditoria/Auditoria'))
 const Predicciones   = lazy(() => import('./pages/private/predicciones/Predicciones'))
+const GemeloDigital  = lazy(() => import('./pages/private/gemelo-digital/GemeloDigital'))
+const Dispositivos   = lazy(() => import('./pages/private/dispositivos/Dispositivos'))
 
 function PageLoader() {
   return (
@@ -91,11 +102,33 @@ export default function App() {
     <AccessibilityProvider>
       <ConfigProvider>
       <NotificationsProvider>
-      <QueryClientProvider client={queryClient}>
+      <PersistQueryClientProvider
+        client={queryClient}
+        persistOptions={{
+          persister: idbPersister,
+          maxAge: 7 * 24 * 60 * 60_000,
+          buster: 'v1',
+        }}
+      >
         <AuthProvider>
           <BrowserRouter>
-            <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
+            <Toaster
+              position="top-right"
+              gutter={10}
+              containerStyle={{ top: 80, right: 16 }}
+              toastOptions={{
+                duration: 3500,
+                className: '!bg-transparent !shadow-none !p-0',
+                style: { background: 'transparent', boxShadow: 'none', padding: 0, maxWidth: '24rem' },
+                success: { duration: 3500 },
+                error:   { duration: 5000 },
+              }}
+            >
+              {renderToast}
+            </Toaster>
             <AccessibilityPanel />
+            <UpdatePrompt />
+            <OfflineBootstrap />
             <Suspense fallback={<PageLoader />}>
               <Routes>
                 {/* Public */}
@@ -143,6 +176,8 @@ export default function App() {
                     <Route path="/dashboard/insumos/:id" element={<InsumoDetalle />} />
                     <Route path="/dashboard/insumos/:id/editar" element={<AdminRoute><InsumoForm /></AdminRoute>} />
 
+                    <Route path="/dashboard/alimentacion" element={<Alimentacion />} />
+
                     <Route path="/dashboard/empleados" element={<AdminRoute><EmpleadosList /></AdminRoute>} />
                     <Route path="/dashboard/empleados/nuevo" element={<AdminRoute><EmpleadoForm /></AdminRoute>} />
                     <Route path="/dashboard/empleados/:id" element={<AdminRoute><EmpleadoDetalle /></AdminRoute>} />
@@ -158,10 +193,12 @@ export default function App() {
                     <Route path="/dashboard/proveedores/:id" element={<AdminRoute><ProveedorDetalle /></AdminRoute>} />
                     <Route path="/dashboard/proveedores/:id/editar" element={<AdminRoute><ProveedorForm /></AdminRoute>} />
 
+                    <Route path="/dashboard/gemelo-digital" element={<GemeloDigital />} />
                     <Route path="/dashboard/predicciones" element={<Predicciones />} />
                     <Route path="/dashboard/reportes" element={<Reportes />} />
                     <Route path="/dashboard/configuracion" element={<AdminRoute><Configuracion /></AdminRoute>} />
                     <Route path="/dashboard/auditoria" element={<AdminRoute><Auditoria /></AdminRoute>} />
+                    <Route path="/dashboard/dispositivos" element={<AdminRoute><Dispositivos /></AdminRoute>} />
                     <Route path="/dashboard/*" element={<Navigate to="/dashboard" replace />} />
                   </Route>
                 </Route>
@@ -171,7 +208,7 @@ export default function App() {
             </Suspense>
           </BrowserRouter>
         </AuthProvider>
-      </QueryClientProvider>
+      </PersistQueryClientProvider>
       </NotificationsProvider>
       </ConfigProvider>
     </AccessibilityProvider>

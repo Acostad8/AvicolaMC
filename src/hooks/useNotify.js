@@ -1,6 +1,6 @@
-import toast from 'react-hot-toast'
 import { useConfig } from '../context/ConfigContext'
 import { useNotifications } from '../context/NotificationsContext'
+import { showToast } from '../components/ui/Toast'
 
 /**
  * Hook para emitir notificaciones respetando las preferencias del usuario.
@@ -20,20 +20,12 @@ export function useNotify() {
     const globalOn = prefs.habilitadas !== false
     const catOn    = prefs[categoria]  !== false
 
-    // Siempre guarda en el historial si las notificaciones están habilitadas
     if (globalOn) {
       addNotification({ titulo, mensaje, tipo, categoria })
     }
-
-    // Muestra el toast solo si la categoría está habilitada
     if (!globalOn || !catOn) return
 
-    switch (tipo) {
-      case 'success': toast.success(titulo ? `${titulo}: ${mensaje}` : mensaje); break
-      case 'error':   toast.error(titulo ? `${titulo}: ${mensaje}` : mensaje);   break
-      case 'warning': toast(titulo ? `${titulo}: ${mensaje}` : mensaje, { icon: '⚠️' }); break
-      default:        toast(titulo ? `${titulo}: ${mensaje}` : mensaje);          break
-    }
+    showToast({ tipo, titulo: titulo || undefined, mensaje })
   }
 
   return {
